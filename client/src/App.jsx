@@ -16,6 +16,10 @@ function App() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return window.localStorage.getItem('theme') === 'light' ? 'light' : 'dark';
+  });
 
   // Data state
   const [meetings, setMeetings] = useState([]);
@@ -30,6 +34,16 @@ function App() {
     fetchMeetings();
     fetchDashboardStats();
   }, []);
+
+  // Apply theme to document root
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('theme', theme);
+    }
+  }, [theme]);
 
   useEffect(() => {
     if (selectedMeeting) {
@@ -131,7 +145,7 @@ function App() {
             />
 
             {/* Right: Transcript + Action Items */}
-            <div className="panel" style={{ display: 'flex', flexDirection: 'column', background: 'rgba(17, 24, 39, 0.4)' }}>
+            <div className="panel" style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)' }}>
               <TranscriptFeed transcripts={transcripts} />
               <ActionItems items={actionItems} />
               <LiveOutcome />
@@ -233,6 +247,8 @@ function App() {
           streak={dashboardStats?.streak || 0}
           userName={dashboardStats?.user || 'User'}
           onNewMeeting={() => setShowCreateMeeting(true)}
+          theme={theme}
+          onToggleTheme={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
         />
 
         <div className="content-area">

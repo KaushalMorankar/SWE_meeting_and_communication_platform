@@ -78,62 +78,6 @@ export default function HostControls({ meetingTitle }) {
             </div>
 
             {showQR && <QROverlay onClose={() => setShowQR(false)} meetingTitle={meetingTitle} />}
-
-            <style>{`
-        .host-controls {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 10px 16px;
-          background: rgba(17, 24, 39, 0.6);
-          border-top: 1px solid var(--border-glass);
-          border-bottom: 1px solid var(--border-glass);
-        }
-        .controls-group {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        .controls-divider {
-          width: 1px;
-          height: 24px;
-          background: var(--border-glass);
-          margin: 0 4px;
-        }
-        .control-btn {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 7px 14px;
-          border: 1px solid var(--border-glass);
-          border-radius: var(--radius-sm);
-          background: var(--bg-glass);
-          color: var(--text-secondary);
-          font-family: 'Inter', sans-serif;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          position: relative;
-        }
-        .control-btn:hover {
-          background: var(--bg-glass-hover);
-          color: var(--text-primary);
-          border-color: var(--border-glass-active);
-        }
-        .control-btn.recording {
-          background: rgba(248, 113, 113, 0.12);
-          color: var(--accent-rose);
-          border-color: rgba(248, 113, 113, 0.3);
-        }
-        .rec-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: var(--accent-rose);
-          animation: pulse 1s ease infinite;
-        }
-      `}</style>
         </>
     );
 }

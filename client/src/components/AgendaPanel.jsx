@@ -137,56 +137,6 @@ export default function AgendaPanel({ agendaItems, onItemChange }) {
                     </div>
                 ))}
             </div>
-
-            <style>{`
-        .agenda-panel { background: rgba(17, 24, 39, 0.4); }
-        .agenda-timer-bar {
-          padding: 12px 16px;
-          background: rgba(79, 142, 247, 0.06);
-          border-bottom: 1px solid var(--border-glass);
-        }
-        .timer-display {
-          display: flex; align-items: center; gap: 8px;
-          margin-bottom: 8px; color: var(--accent-blue);
-        }
-        .timer-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-        .timer-label { font-size: 12px; color: var(--text-muted); }
-        .agenda-list { padding: 8px; }
-        .agenda-item {
-          padding: 14px; margin-bottom: 4px;
-          border-radius: var(--radius-sm); border: 1px solid transparent;
-          transition: all 0.3s ease;
-        }
-        .agenda-item:hover { background: var(--bg-glass-hover); }
-        .agenda-item.active {
-          background: rgba(79, 142, 247, 0.08);
-          border-color: rgba(79, 142, 247, 0.2);
-        }
-        .agenda-item.completed { opacity: 0.5; }
-        .agenda-item-header { display: flex; align-items: flex-start; gap: 12px; }
-        .agenda-item-number {
-          width: 28px; height: 28px;
-          display: flex; align-items: center; justify-content: center;
-          border-radius: 50%; background: var(--bg-glass);
-          font-size: 12px; font-weight: 600; color: var(--text-secondary);
-          flex-shrink: 0;
-        }
-        .completed-icon { color: var(--accent-emerald); }
-        .active-pulse {
-          width: 10px; height: 10px; border-radius: 50%;
-          background: var(--accent-blue); animation: pulse 1.5s ease infinite;
-          box-shadow: 0 0 10px var(--accent-blue);
-        }
-        .agenda-item-content { flex: 1; }
-        .agenda-item-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
-        .agenda-item-meta {
-          display: flex; align-items: center; gap: 4px;
-          font-size: 11px; color: var(--text-muted);
-        }
-        .agenda-item-actions {
-          display: flex; gap: 6px; margin-top: 10px; padding-left: 40px;
-        }
-      `}</style>
         </div>
     );
 }
