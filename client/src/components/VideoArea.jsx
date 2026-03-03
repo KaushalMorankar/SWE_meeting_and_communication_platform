@@ -1,5 +1,6 @@
 import HostControls from './HostControls';
-import { Users, Maximize2 } from 'lucide-react';
+import Icon from './Icon';
+import { UserGroupIcon, FullScreenIcon } from '@hugeicons/core-free-icons';
 
 export default function VideoArea({ meetingTitle, participants }) {
     return (
@@ -8,12 +9,12 @@ export default function VideoArea({ meetingTitle, participants }) {
                 <div>
                     <h2 className="video-meeting-title">{meetingTitle || 'No Active Meeting'}</h2>
                     <div className="video-meeting-meta">
-                        <Users size={14} />
+                        <Icon icon={UserGroupIcon} size={14} />
                         <span>{participants?.length || 0} participants</span>
                     </div>
                 </div>
                 <button className="btn-icon tooltip" data-tooltip="Fullscreen" id="btn-fullscreen">
-                    <Maximize2 size={16} />
+                    <Icon icon={FullScreenIcon} size={16} />
                 </button>
             </div>
 

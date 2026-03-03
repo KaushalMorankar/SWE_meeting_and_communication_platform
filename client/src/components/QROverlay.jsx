@@ -1,4 +1,5 @@
-import { X } from 'lucide-react';
+import Icon from './Icon';
+import { Cancel01Icon } from '@hugeicons/core-free-icons';
 
 export default function QROverlay({ onClose, meetingTitle }) {
     return (
@@ -57,7 +58,7 @@ export default function QROverlay({ onClose, meetingTitle }) {
                     className="btn btn-secondary"
                     style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
-                    <X size={16} /> Close
+                    <Icon icon={Cancel01Icon} size={16} /> Close
                 </button>
             </div>
         </div>

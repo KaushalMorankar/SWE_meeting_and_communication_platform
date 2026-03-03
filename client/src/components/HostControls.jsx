@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { Mic, MicOff, Video as VideoIcon, VideoOff, ScreenShare, QrCode, Users, Shield, Radio, MonitorUp } from 'lucide-react';
+import Icon from './Icon';
+import {
+  Mic01Icon,
+  MicOff01Icon,
+  Video01Icon,
+  VideoOffIcon,
+  ComputerScreenShareIcon,
+  QrCodeIcon,
+  UserGroupIcon,
+  Shield01Icon,
+  RecordIcon,
+} from '@hugeicons/core-free-icons';
 import QROverlay from './QROverlay';
 
 export default function HostControls({ meetingTitle }) {
@@ -19,7 +30,7 @@ export default function HostControls({ meetingTitle }) {
                         onClick={() => setMuted(!muted)}
                         id="btn-mute"
                     >
-                        {muted ? <MicOff size={18} /> : <Mic size={18} />}
+                        {muted ? <Icon icon={MicOff01Icon} size={18} /> : <Icon icon={Mic01Icon} size={18} />}
                     </button>
 
                     <button
@@ -28,7 +39,7 @@ export default function HostControls({ meetingTitle }) {
                         onClick={() => setVideoOn(!videoOn)}
                         id="btn-video"
                     >
-                        {videoOn ? <VideoIcon size={18} /> : <VideoOff size={18} />}
+                        {videoOn ? <Icon icon={Video01Icon} size={18} /> : <Icon icon={VideoOffIcon} size={18} />}
                     </button>
 
                     <button
@@ -37,7 +48,7 @@ export default function HostControls({ meetingTitle }) {
                         onClick={() => setSharing(!sharing)}
                         id="btn-screen-share"
                     >
-                        <MonitorUp size={18} />
+                        <Icon icon={ComputerScreenShareIcon} size={18} />
                     </button>
 
                     <div className="controls-divider"></div>
@@ -47,7 +58,7 @@ export default function HostControls({ meetingTitle }) {
                         onClick={() => setRecording(!recording)}
                         id="btn-record"
                     >
-                        <Radio size={16} />
+                        <Icon icon={RecordIcon} size={16} />
                         <span>{recording ? 'Recording' : 'Record'}</span>
                         {recording && <div className="rec-dot"></div>}
                     </button>
@@ -57,17 +68,17 @@ export default function HostControls({ meetingTitle }) {
                         onClick={() => setShowQR(true)}
                         id="btn-qr-attendance"
                     >
-                        <QrCode size={16} />
+                        <Icon icon={QrCodeIcon} size={16} />
                         <span>Attendance</span>
                     </button>
 
                     <button className="control-btn" id="btn-participants">
-                        <Users size={16} />
+                        <Icon icon={UserGroupIcon} size={16} />
                         <span>Participants</span>
                     </button>
 
                     <button className="control-btn" id="btn-host-actions">
-                        <Shield size={16} />
+                        <Icon icon={Shield01Icon} size={16} />
                         <span>Host Panel</span>
                     </button>
                 </div>

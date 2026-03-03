@@ -1,4 +1,5 @@
-import { CheckCircle, Clock, AlertCircle, ArrowRight } from 'lucide-react';
+import Icon from './Icon';
+import { CheckmarkCircle01Icon, Clock01Icon, AlertCircleIcon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 
 const categoryChips = {
     'Technical': 'chip-blue',
@@ -8,9 +9,9 @@ const categoryChips = {
 };
 
 const statusConfig = {
-    'completed': { icon: CheckCircle, color: 'var(--accent-emerald)', label: 'Completed' },
-    'in-progress': { icon: Clock, color: 'var(--accent-amber)', label: 'In Progress' },
-    'pending': { icon: AlertCircle, color: 'var(--text-muted)', label: 'Pending' },
+    'completed': { icon: CheckmarkCircle01Icon, color: 'var(--accent-emerald)', label: 'Completed' },
+    'in-progress': { icon: Clock01Icon, color: 'var(--accent-amber)', label: 'In Progress' },
+    'pending': { icon: AlertCircleIcon, color: 'var(--text-muted)', label: 'Pending' },
 };
 
 export default function ActionItems({ items }) {
@@ -34,7 +35,7 @@ export default function ActionItems({ items }) {
                             id={`action-item-${item.id}`}
                         >
                             <div className="ai-card-top">
-                                <StatusIcon size={16} style={{ color: status.color, flexShrink: 0 }} />
+                                <Icon icon={status.icon} size={16} style={{ color: status.color, flexShrink: 0 }} />
                                 <span className="ai-card-title">{item.title}</span>
                             </div>
 
@@ -43,11 +44,11 @@ export default function ActionItems({ items }) {
                                     {item.category}
                                 </span>
                                 <span className="ai-card-assignee">
-                                    <ArrowRight size={10} />
+                                    <Icon icon={ArrowRight01Icon} size={10} />
                                     {item.assignee}
                                 </span>
                                 <span className="ai-card-deadline">
-                                    <Clock size={10} />
+                                    <Icon icon={Clock01Icon} size={10} />
                                     {item.deadline}
                                 </span>
                             </div>

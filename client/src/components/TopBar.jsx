@@ -1,38 +1,53 @@
 import { useState } from 'react';
-import { Search, Bell, Flame, ChevronDown, User, Moon, Sun, Plus } from 'lucide-react';
+import Icon from './Icon';
+import {
+  Search01Icon,
+  Notification01Icon,
+  FireIcon,
+  ArrowDown01Icon,
+  UserIcon,
+  Moon01Icon,
+  Sun01Icon,
+  Add01Icon,
+} from '@hugeicons/core-free-icons';
 
-export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark', onToggleTheme }) {
+function SidebarToggleIcon({ collapsed }) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="svg-icon sidebar-toggle-button-icon">
+            <rect x="1" y="2" width="22" height="20" rx="4" />
+            <rect x="4" y="5" width="2" height="14" rx="2" fill="currentColor" className={collapsed ? 'sidebar-toggle-icon-close' : 'sidebar-toggle-icon-open'} />
+        </svg>
+    );
+}
+
+export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark', onToggleTheme, sidebarCollapsed, onSidebarToggle }) {
     const [showNotif, setShowNotif] = useState(false);
 
     return (
         <header className="topbar">
             <div className="topbar-left">
+                <div type="button" className="sidebar-toggle" onClick={onSidebarToggle} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+                    <SidebarToggleIcon collapsed={sidebarCollapsed} />
+                </div>
                 <div className="topbar-brand">
-                    <div className="brand-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                            <rect x="2" y="3" width="20" height="18" rx="4" stroke="url(#g1)" strokeWidth="2" />
-                            <path d="M8 10L12 13L16 10" stroke="url(#g1)" strokeWidth="2" strokeLinecap="round" />
-                            <defs><linearGradient id="g1" x1="2" y1="3" x2="22" y2="21"><stop stopColor="#4F8EF7" /><stop offset="1" stopColor="#7C5CFC" /></linearGradient></defs>
-                        </svg>
-                    </div>
                     <span className="brand-name">MCMS</span>
                 </div>
             </div>
 
             <div className="topbar-center">
                 <div className="search-box">
-                    <Search size={16} />
+                    <Icon icon={Search01Icon} size={16} />
                     <input type="text" placeholder="Search meetings, agendas, transcripts..." />
                 </div>
             </div>
 
             <div className="topbar-right">
                 <button className="btn btn-primary" onClick={onNewMeeting} id="btn-new-meeting">
-                    <Plus size={16} /> New Meeting
+                    <Icon icon={Add01Icon} size={16} /> New Meeting
                 </button>
 
                 <div className="streak-badge tooltip" data-tooltip={`${streak} meeting streak!`}>
-                    <Flame size={18} className="streak-icon" />
+                    <Icon icon={FireIcon} size={18} className="streak-icon" />
                     <span>{streak}</span>
                 </div>
 
@@ -41,16 +56,16 @@ export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark',
                     onClick={() => setShowNotif(!showNotif)}
                     id="btn-notifications"
                 >
-                    <Bell size={18} />
+                    <Icon icon={Notification01Icon} size={18} />
                     <span className="notif-dot"></span>
                 </button>
 
                 <div className="user-menu">
                     <div className="user-avatar">
-                        <User size={18} />
+                        <Icon icon={UserIcon} size={18} />
                     </div>
                     <span className="user-name">{userName}</span>
-                    <ChevronDown size={14} />
+                    <Icon icon={ArrowDown01Icon} size={14} />
                 </div>
 
                 <button
@@ -61,7 +76,7 @@ export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark',
                     onClick={onToggleTheme}
                 >
                     <span className="theme-toggle-thumb">
-                        {theme === 'light' ? <Sun size={14} /> : <Moon size={14} />}
+                        {theme === 'light' ? <Icon icon={Sun01Icon} size={14} /> : <Icon icon={Moon01Icon} size={14} />}
                     </span>
                 </button>
             </div>

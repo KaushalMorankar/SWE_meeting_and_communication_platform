@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { TrendingUp, Clock, Users, CheckSquare, Flame, Award, BarChart3, Calendar } from 'lucide-react';
+import Icon from './Icon';
+import {
+  ChartIncreaseIcon,
+  Clock01Icon,
+  UserGroupIcon,
+  CheckmarkSquare01Icon,
+  FireIcon,
+  Award01Icon,
+  BarChartIcon,
+  Calendar02Icon,
+} from '@hugeicons/core-free-icons';
 
 export default function ProductivityDashboard({ stats }) {
     const [activeTab, setActiveTab] = useState('overview');
@@ -38,7 +48,7 @@ export default function ProductivityDashboard({ stats }) {
                 <div className="dashboard-grid">
                     <div className="stat-card glass-card">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <Calendar size={18} style={{ color: 'var(--accent-blue)' }} />
+                            <Icon icon={Calendar02Icon} size={18} style={{ color: 'var(--accent-blue)' }} />
                             <span className="stat-label">Meetings Attended</span>
                         </div>
                         <div className="stat-value">{stats.totalMeetings}</div>
@@ -46,7 +56,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <Clock size={18} style={{ color: 'var(--accent-violet)' }} />
+                            <Icon icon={Clock01Icon} size={18} style={{ color: 'var(--accent-violet)' }} />
                             <span className="stat-label">Total Hours</span>
                         </div>
                         <div className="stat-value">{stats.totalHours}</div>
@@ -54,7 +64,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <TrendingUp size={18} style={{ color: 'var(--accent-emerald)' }} />
+                            <Icon icon={ChartIncreaseIcon} size={18} style={{ color: 'var(--accent-emerald)' }} />
                             <span className="stat-label">Punctuality Rate</span>
                         </div>
                         <div className="stat-value">{stats.punctualityRate}%</div>
@@ -62,7 +72,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <CheckSquare size={18} style={{ color: 'var(--accent-amber)' }} />
+                            <Icon icon={CheckmarkSquare01Icon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Tasks Completed</span>
                         </div>
                         <div className="stat-value">{stats.tasksCompleted}/{stats.tasksTotal}</div>
@@ -70,7 +80,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <BarChart3 size={18} style={{ color: 'var(--accent-cyan)' }} />
+                            <Icon icon={BarChartIcon} size={18} style={{ color: 'var(--accent-cyan)' }} />
                             <span className="stat-label">Weekly Meeting Load Heatmap</span>
                         </div>
                         <div className="heatmap-bar">
@@ -91,7 +101,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <Award size={18} style={{ color: 'var(--accent-amber)' }} />
+                            <Icon icon={Award01Icon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Badges & Achievements</span>
                         </div>
                         <div className="badges-grid">
@@ -109,7 +119,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <Flame size={18} style={{ color: 'var(--accent-amber)' }} />
+                            <Icon icon={FireIcon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Meeting Streak</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -120,7 +130,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <Users size={18} style={{ color: 'var(--accent-violet)' }} />
+                            <Icon icon={UserGroupIcon} size={18} style={{ color: 'var(--accent-violet)' }} />
                             <span className="stat-label">Sentiment Profile</span>
                         </div>
                         <div className="sentiment-bars">
@@ -154,7 +164,7 @@ export default function ProductivityDashboard({ stats }) {
                 <div className="dashboard-grid">
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <Calendar size={18} style={{ color: 'var(--accent-blue)' }} />
+                            <Icon icon={Calendar02Icon} size={18} style={{ color: 'var(--accent-blue)' }} />
                             <span className="stat-label">Monthly Attendance</span>
                         </div>
                         <div className="attendance-chart">
@@ -175,7 +185,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <Clock size={18} style={{ color: 'var(--accent-violet)' }} />
+                            <Icon icon={Clock01Icon} size={18} style={{ color: 'var(--accent-violet)' }} />
                             <span className="stat-label">Speaking Time vs Average Meeting Duration</span>
                         </div>
                         <div style={{ display: 'flex', gap: '24px', alignItems: 'center', padding: '12px 0' }}>
@@ -201,7 +211,7 @@ export default function ProductivityDashboard({ stats }) {
                 <div className="dashboard-grid">
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <Award size={18} style={{ color: 'var(--accent-amber)' }} />
+                            <Icon icon={Award01Icon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Contribution & Engagement</span>
                         </div>
                         <div className="engagement-metrics">
@@ -228,7 +238,7 @@ export default function ProductivityDashboard({ stats }) {
 
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <TrendingUp size={18} style={{ color: 'var(--accent-emerald)' }} />
+                            <Icon icon={ChartIncreaseIcon} size={18} style={{ color: 'var(--accent-emerald)' }} />
                             <span className="stat-label">AI-Generated Recommendations</span>
                         </div>
                         <div className="recommendations">

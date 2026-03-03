@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, CheckCircle, Clock, ChevronRight, FileText, Plus } from 'lucide-react';
+import Icon from './Icon';
+import {
+  PlayIcon,
+  PauseIcon,
+  CheckmarkCircle01Icon,
+  Clock01Icon,
+  Add01Icon,
+} from '@hugeicons/core-free-icons';
 
 export default function AgendaPanel({ agendaItems, onItemChange }) {
     const [items, setItems] = useState(agendaItems);
@@ -72,14 +79,14 @@ export default function AgendaPanel({ agendaItems, onItemChange }) {
             <div className="section-header">
                 <span className="section-title">📋 Agenda</span>
                 <button className="btn-icon" id="btn-add-agenda">
-                    <Plus size={16} />
+                    <Icon icon={Add01Icon} size={16} />
                 </button>
             </div>
 
             {activeId && (
                 <div className="agenda-timer-bar">
                     <div className="timer-display">
-                        <Clock size={14} />
+                        <Icon icon={Clock01Icon} size={14} />
                         <span className="timer-value">{formatTime(countdown)}</span>
                         <span className="timer-label">remaining</span>
                     </div>
@@ -100,7 +107,7 @@ export default function AgendaPanel({ agendaItems, onItemChange }) {
                         <div className="agenda-item-header">
                             <div className="agenda-item-number">
                                 {item.status === 'completed' ? (
-                                    <CheckCircle size={18} className="completed-icon" />
+                                    <Icon icon={CheckmarkCircle01Icon} size={18} className="completed-icon" />
                                 ) : item.status === 'active' ? (
                                     <div className="active-pulse"></div>
                                 ) : (
@@ -110,7 +117,7 @@ export default function AgendaPanel({ agendaItems, onItemChange }) {
                             <div className="agenda-item-content">
                                 <div className="agenda-item-title">{item.title}</div>
                                 <div className="agenda-item-meta">
-                                    <Clock size={12} />
+                                    <Icon icon={Clock01Icon} size={12} />
                                     <span>{item.duration} min</span>
                                 </div>
                             </div>
@@ -121,15 +128,15 @@ export default function AgendaPanel({ agendaItems, onItemChange }) {
                                 {item.status === 'active' ? (
                                     <>
                                         <button className="btn btn-secondary" onClick={pauseItem} style={{ fontSize: '12px', padding: '5px 10px' }}>
-                                            <Pause size={12} /> Pause
+                                            <Icon icon={PauseIcon} size={12} /> Pause
                                         </button>
                                         <button className="btn btn-success" onClick={() => completeItem(item.id)} style={{ fontSize: '12px', padding: '5px 10px' }}>
-                                            <CheckCircle size={12} /> Complete
+                                            <Icon icon={CheckmarkCircle01Icon} size={12} /> Complete
                                         </button>
                                     </>
                                 ) : (
                                     <button className="btn btn-primary" onClick={() => startItem(item.id)} style={{ fontSize: '12px', padding: '5px 10px' }}>
-                                        <Play size={12} /> Start
+                                        <Icon icon={PlayIcon} size={12} /> Start
                                     </button>
                                 )}
                             </div>

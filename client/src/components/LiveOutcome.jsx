@@ -1,4 +1,5 @@
-import { Eye, Target, AlertTriangle, TrendingUp } from 'lucide-react';
+import Icon from './Icon';
+import { Target01Icon, Alert01Icon, ChartIncreaseIcon } from '@hugeicons/core-free-icons';
 
 export default function LiveOutcome() {
     return (
@@ -38,15 +39,15 @@ export default function LiveOutcome() {
 
                 <div className="outcome-items">
                     <div className="outcome-item">
-                        <Target size={14} style={{ color: 'var(--accent-emerald)' }} />
+                        <Icon icon={Target01Icon} size={14} style={{ color: 'var(--accent-emerald)' }} />
                         <span>2 of 5 agenda items addressed</span>
                     </div>
                     <div className="outcome-item">
-                        <TrendingUp size={14} style={{ color: 'var(--accent-blue)' }} />
+                        <Icon icon={ChartIncreaseIcon} size={14} style={{ color: 'var(--accent-blue)' }} />
                         <span>3 action items extracted so far</span>
                     </div>
                     <div className="outcome-item">
-                        <AlertTriangle size={14} style={{ color: 'var(--accent-amber)' }} />
+                        <Icon icon={Alert01Icon} size={14} style={{ color: 'var(--accent-amber)' }} />
                         <span>3 topics still unaddressed</span>
                     </div>
                 </div>

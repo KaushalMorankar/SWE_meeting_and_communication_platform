@@ -1,9 +1,10 @@
-import { Pin, ThumbsUp, ThumbsDown, Minus } from 'lucide-react';
+import Icon from './Icon';
+import { PinIcon, ThumbsUpIcon, ThumbsDownIcon, MinusSignIcon } from '@hugeicons/core-free-icons';
 
 const sentimentConfig = {
-    positive: { icon: ThumbsUp, class: 'sentiment-positive', label: 'Positive' },
-    neutral: { icon: Minus, class: 'sentiment-neutral', label: 'Neutral' },
-    negative: { icon: ThumbsDown, class: 'sentiment-negative', label: 'Negative' },
+    positive: { icon: ThumbsUpIcon, class: 'sentiment-positive', label: 'Positive' },
+    neutral: { icon: MinusSignIcon, class: 'sentiment-neutral', label: 'Neutral' },
+    negative: { icon: ThumbsDownIcon, class: 'sentiment-negative', label: 'Negative' },
 };
 
 export default function TranscriptFeed({ transcripts }) {
@@ -38,7 +39,7 @@ export default function TranscriptFeed({ transcripts }) {
                                 </div>
                                 <div className="transcript-badges">
                                     <span className={`chip ${sentiment.class}`} style={{ padding: '2px 8px' }}>
-                                        <SentimentIcon size={10} />
+                                        <Icon icon={sentiment.icon} size={10} />
                                         {sentiment.label}
                                     </span>
                                 </div>
@@ -48,7 +49,7 @@ export default function TranscriptFeed({ transcripts }) {
 
                             <div className="transcript-actions">
                                 <button className="transcript-action-btn" id={`pin-${entry.id}`}>
-                                    <Pin size={12} />
+                                    <Icon icon={PinIcon} size={12} />
                                     Pin Resource
                                 </button>
                             </div>

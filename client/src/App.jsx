@@ -235,20 +235,21 @@ function App() {
 
   return (
     <div className="app-container">
-      <Sidebar
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      <TopBar
+        streak={dashboardStats?.streak || 0}
+        userName={dashboardStats?.user || 'User'}
+        onNewMeeting={() => setShowCreateMeeting(true)}
+        theme={theme}
+        onToggleTheme={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+        sidebarCollapsed={sidebarCollapsed}
+        onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
       <div className="main-area">
-        <TopBar
-          streak={dashboardStats?.streak || 0}
-          userName={dashboardStats?.user || 'User'}
-          onNewMeeting={() => setShowCreateMeeting(true)}
-          theme={theme}
-          onToggleTheme={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+        <Sidebar
+          currentView={currentView}
+          onViewChange={setCurrentView}
+          collapsed={sidebarCollapsed}
         />
 
         <div className="content-area">

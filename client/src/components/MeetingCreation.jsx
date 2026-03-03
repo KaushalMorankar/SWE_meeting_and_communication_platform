@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, MapPin, Link, Plus, Trash2, Clock } from 'lucide-react';
+import Icon from './Icon';
+import {
+  Cancel01Icon,
+  Calendar02Icon,
+  Location01Icon,
+  Link01Icon,
+  Delete02Icon,
+  Clock01Icon,
+} from '@hugeicons/core-free-icons';
 import * as chrono from 'chrono-node';
 
 function formatSlotDisplay(date) {
@@ -261,7 +269,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                 <div className="modal-header">
                     <h2 className="modal-title">Create New Meeting</h2>
                     <button className="btn-icon" onClick={onClose}>
-                        <X size={18} />
+                        <Icon icon={Cancel01Icon} size={18} />
                     </button>
                 </div>
 
@@ -290,9 +298,9 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                                     onClick={() => setModality(m)}
                                     id={`modality-${m.toLowerCase()}`}
                                 >
-                                    {m === 'Online' && <Link size={14} />}
-                                    {m === 'Offline' && <MapPin size={14} />}
-                                    {m === 'Hybrid' && <><Link size={14} /><MapPin size={14} /></>}
+                                    {m === 'Online' && <Icon icon={Link01Icon} size={14} />}
+                                    {m === 'Offline' && <Icon icon={Location01Icon} size={14} />}
+                                    {m === 'Hybrid' && <><Icon icon={Link01Icon} size={14} /><Icon icon={Location01Icon} size={14} /></>}
                                     {m}
                                 </button>
                             ))}
@@ -331,7 +339,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
 
                         <div className="nldate-wrapper">
                             <div ref={inputRowRef} className={`nldate-input-row${slotError ? ' nldate-error' : ''}`}>
-                                <Clock size={14} className="nldate-icon" />
+                                <Icon icon={Clock01Icon} size={14} className="nldate-icon" />
                                 <input
                                     ref={inputRef}
                                     type="text"
@@ -345,7 +353,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                                 />
                                 {inputValue && (
                                     <button type="button" className="nldate-clear" onClick={() => { setInputValue(''); inputRef.current?.focus(); }}>
-                                        <X size={12} />
+                                        <Icon icon={Cancel01Icon} size={12} />
                                     </button>
                                 )}
                             </div>
@@ -376,11 +384,11 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                         {slots.map(slot => (
                             <div key={slot.id} className="slot-row">
                                 <div className="slot-row-content">
-                                    <Calendar size={14} className="slot-row-icon" />
+                                    <Icon icon={Calendar02Icon} size={14} className="slot-row-icon" />
                                     <span>{slot.display}</span>
                                 </div>
                                 <button type="button" className="btn-icon" onClick={() => removeSlot(slot.id)} style={{ width: '20px', height: '20px' }}>
-                                    <Trash2 size={14} />
+                                    <Icon icon={Delete02Icon} size={14} />
                                 </button>
                             </div>
                         ))}
@@ -389,7 +397,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
                         <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
                         <button type="submit" className="btn btn-primary" id="btn-create-meeting">
-                            <Calendar size={16} />
+                            <Icon icon={Calendar02Icon} size={16} />
                             Create Meeting
                         </button>
                     </div>
