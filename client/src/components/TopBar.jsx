@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Bell, Flame, ChevronDown, User, Moon, Sun } from 'lucide-react';
+import { Search, Bell, Flame, ChevronDown, User, Moon, Sun, Plus } from 'lucide-react';
 
 export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark', onToggleTheme }) {
     const [showNotif, setShowNotif] = useState(false);
@@ -28,7 +28,7 @@ export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark',
 
             <div className="topbar-right">
                 <button className="btn btn-primary" onClick={onNewMeeting} id="btn-new-meeting">
-                    + New Meeting
+                    <Plus size={16} /> New Meeting
                 </button>
 
                 <div className="streak-badge tooltip" data-tooltip={`${streak} meeting streak!`}>

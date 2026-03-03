@@ -116,9 +116,8 @@ body {
 }
 
 .btn-primary {
-  background: var(--gradient-brand);
+  background: var(--flexoki-blue-600);
   color: white;
-  box-shadow: var(--shadow-glow-blue);
 }
 
 .btn-primary:hover {
@@ -155,8 +154,8 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
+  background: none;
+  border: none;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -296,7 +295,7 @@ select.input {
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-lg);
   padding: 28px;
-  width: 90%;
+  width: 100%;
   max-width: 520px;
   max-height: 85vh;
   overflow-y: auto;
@@ -668,6 +667,12 @@ select.input {
 .sidebar.collapsed {
   width: 60px;
 }
+.sidebar-toggle-icon-open {
+width: 24%;
+}
+.sidebar-toggle-icon-close {
+width: 8.33%;
+}
 
 .sidebar-nav {
   display: flex;
@@ -778,7 +783,7 @@ select.input {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: 1px;
+  letter-spacing: -0.022em;
 }
 
 .topbar-center {
@@ -791,7 +796,7 @@ select.input {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
+  padding: 8px 12px;
   background: var(--bg-glass);
   border: 1px solid var(--border-glass);
   border-radius: 100px;
@@ -913,7 +918,7 @@ select.input {
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: var(--flexoki-100);
+  /* background: var(--flexoki-100); */
   display: flex;
   align-items: center;
   justify-content: center;
