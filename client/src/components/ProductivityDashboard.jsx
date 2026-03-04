@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import Icon from './Icon';
 import {
-  ChartIncreaseIcon,
-  Clock01Icon,
-  UserGroupIcon,
-  CheckmarkSquare01Icon,
-  FireIcon,
-  Award01Icon,
-  BarChartIcon,
-  Calendar02Icon,
+    ChartIncreaseIcon,
+    Clock01Icon,
+    UserGroupIcon,
+    CheckmarkSquare01Icon,
+    FireIcon,
+    Award01Icon,
+    BarChartIcon,
+    Calendar02Icon,
 } from '@hugeicons/core-free-icons';
 
-export default function ProductivityDashboard({ stats }) {
+export default function ProductivityDashboard({ stats, userName }) {
     const [activeTab, setActiveTab] = useState('overview');
 
     if (!stats) return null;
@@ -26,7 +26,7 @@ export default function ProductivityDashboard({ stats }) {
                         Productivity Dashboard
                     </h2>
                     <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                        Welcome back, {stats.user}. Here's your meeting intelligence overview.
+                        Welcome back, <strong>{userName || stats.user}</strong>. Here's your meeting intelligence overview.
                     </p>
                 </div>
             </div>

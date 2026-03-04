@@ -143,7 +143,7 @@ function DashboardApp() {
       case "dashboard":
         return (
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <ProductivityDashboard stats={dashboardStats} />
+            <ProductivityDashboard stats={dashboardStats} userName={user?.name} />
           </div>
         );
 
@@ -263,7 +263,7 @@ function DashboardApp() {
       case "analytics":
         return (
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <ProductivityDashboard stats={dashboardStats} />
+            <ProductivityDashboard stats={dashboardStats} userName={user?.name} />
           </div>
         );
 
