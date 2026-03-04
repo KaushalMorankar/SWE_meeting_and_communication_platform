@@ -1,178 +1,196 @@
 const express = require('express');
 const cors = require('cors');
+const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+
+dotenv.config();
+
+// ── Optional MongoDB connection ──────────────────────────────
+let usingMongo = false;
+let User = null;
+try {
+    const mongoose = require('mongoose');
+    mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/mcms_db')
+        .then(() => {
+            console.log('✅ MongoDB Connected');
+            usingMongo = true;
+        })
+        .catch(err => console.log('⚠️  MongoDB not available — using in-memory store:', err.message));
+    User = require('./models/User');
+} catch (e) {
+    console.log('⚠️  Mongoose not found — using in-memory store');
+}
+
+// ── In-memory fallback store ─────────────────────────────────
+const inMemoryUsers = [];
+
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'mcms_super_secret_key';
 
 app.use(cors());
 app.use(express.json());
 
-// ─── Mock Data ───────────────────────────────────────────────
+// ─── Auth Helpers ─────────────────────────────────────────────
+const generateToken = (id) => jwt.sign({ id }, JWT_SECRET, { expiresIn: '30d' });
+const { protect } = require('./middleware/auth');
 
+// ─── REGISTER ─────────────────────────────────────────────────
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: 'Please provide name, email, and password' });
+        }
+
+        if (usingMongo && User) {
+            let existing = await User.findOne({ email });
+            if (existing) return res.status(400).json({ message: 'User already exists' });
+            const user = await User.create({ name, email, password });
+            return res.status(201).json({ _id: user._id, name: user.name, email: user.email, token: generateToken(user._id) });
+        } else {
+            const existing = inMemoryUsers.find(u => u.email === email.toLowerCase());
+            if (existing) return res.status(400).json({ message: 'User already exists' });
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash(password, salt);
+            const userId = `user_${Date.now()}`;
+            const user = { _id: userId, name, email: email.toLowerCase(), password: hashedPassword };
+            inMemoryUsers.push(user);
+            return res.status(201).json({ _id: user._id, name: user.name, email: user.email, token: generateToken(user._id) });
+        }
+    } catch (error) {
+        console.error('Register error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// ─── LOGIN ────────────────────────────────────────────────────
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Please provide email and password' });
+        }
+
+        if (usingMongo && User) {
+            const user = await User.findOne({ email });
+            if (!user) return res.status(401).json({ message: 'Invalid email or password' });
+            const isMatch = await user.matchPassword(password);
+            if (!isMatch) return res.status(401).json({ message: 'Invalid email or password' });
+            return res.json({ _id: user._id, name: user.name, email: user.email, token: generateToken(user._id) });
+        } else {
+            const user = inMemoryUsers.find(u => u.email === email.toLowerCase());
+            if (!user) return res.status(401).json({ message: 'Invalid email or password' });
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) return res.status(401).json({ message: 'Invalid email or password' });
+            return res.json({ _id: user._id, name: user.name, email: user.email, token: generateToken(user._id) });
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// ─── ME ───────────────────────────────────────────────────────
+app.get('/api/auth/me', protect, async (req, res) => {
+    try {
+        if (usingMongo && User) {
+            const user = await User.findById(req.user.id).select('-password');
+            return res.json(user);
+        }
+        const user = inMemoryUsers.find(u => u._id === req.user.id);
+        res.json(user ? { _id: user._id, name: user.name, email: user.email } : null);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ─── Mock Data ────────────────────────────────────────────────
 const meetings = [
     {
-        id: 'mtg-001',
-        title: 'Sprint Planning — Q1 Review',
-        modality: 'Online',
-        date: '2026-03-05',
-        time: '10:00 AM',
-        host: 'Dr. Sharma',
-        participants: ['Ravi K.', 'Ananya P.', 'Kiran M.', 'Priya S.'],
-        status: 'scheduled',
+        id: 'mtg-001', title: 'Sprint Planning — Q1 Review', modality: 'Online',
+        date: '2026-03-05', time: '10:00 AM', host: 'Dr. Sharma',
+        participants: ['Ravi K.', 'Ananya P.', 'Kiran M.', 'Priya S.'], status: 'scheduled',
         jitsiUrl: 'https://meet.jit.si/mcms-sprint-planning',
     },
     {
-        id: 'mtg-002',
-        title: 'CS301 — Data Structures Lecture',
-        modality: 'Hybrid',
-        date: '2026-03-06',
-        time: '2:00 PM',
-        host: 'Prof. Reddy',
-        participants: ['60 students'],
-        status: 'scheduled',
+        id: 'mtg-002', title: 'CS301 — Data Structures Lecture', modality: 'Hybrid',
+        date: '2026-03-06', time: '2:00 PM', host: 'Prof. Reddy',
+        participants: ['60 students'], status: 'scheduled',
         jitsiUrl: 'https://meet.jit.si/mcms-cs301',
     },
     {
-        id: 'mtg-003',
-        title: 'Candidate Interview — Frontend Role',
-        modality: 'Online',
-        date: '2026-03-07',
-        time: '11:30 AM',
-        host: 'Vikram T.',
-        participants: ['Candidate: Aditi R.'],
-        status: 'completed',
-        jitsiUrl: null,
+        id: 'mtg-003', title: 'Frontend Candidate Evaluation', modality: 'Online',
+        date: '2026-02-28', time: '3:00 PM', host: 'HR Team',
+        participants: ['Priya S.', 'Ravi K.'], status: 'completed',
     },
 ];
 
 const agendas = {
     'mtg-001': [
-        { id: 'ag-1', title: 'Review Previous Sprint Goals', duration: 10, status: 'completed', notes: 'All tasks closed.' },
-        { id: 'ag-2', title: 'Demo: New Dashboard Module', duration: 15, status: 'active', notes: '' },
-        { id: 'ag-3', title: 'Discuss Backend API Changes', duration: 20, status: 'pending', notes: '' },
-        { id: 'ag-4', title: 'Assign Action Items for Next Sprint', duration: 10, status: 'pending', notes: '' },
-        { id: 'ag-5', title: 'Open Floor / Parking Lot', duration: 5, status: 'pending', notes: '' },
-    ],
-    'mtg-002': [
-        { id: 'ag-6', title: 'Recap: Trees & Binary Trees', duration: 10, status: 'pending', notes: '' },
-        { id: 'ag-7', title: 'Lecture: AVL Trees — Rotations', duration: 25, status: 'pending', notes: '' },
-        { id: 'ag-8', title: 'Live Coding Demo', duration: 15, status: 'pending', notes: '' },
-        { id: 'ag-9', title: 'Q&A Session', duration: 10, status: 'pending', notes: '' },
+        { id: 'ag-1', title: 'Review Previous Sprint Goals', duration: 10, status: 'active', notes: '' },
+        { id: 'ag-2', title: 'Demo: New Dashboard Module', duration: 15, status: 'pending', notes: '' },
+        { id: 'ag-3', title: 'Plan next sprint tasks', duration: 20, status: 'pending', notes: '' },
     ],
 };
 
 const transcripts = {
     'mtg-001': [
-        { id: 't-1', speaker: 'Dr. Sharma', text: 'Let\'s start with the sprint review. Ravi, can you walk us through last sprint?', timestamp: '10:01:12', sentiment: 'neutral', agendaId: 'ag-1' },
-        { id: 't-2', speaker: 'Ravi K.', text: 'Sure. We closed 14 out of 16 tasks. The two remaining are the notification service and the QR module.', timestamp: '10:01:45', sentiment: 'positive', agendaId: 'ag-1' },
-        { id: 't-3', speaker: 'Ananya P.', text: 'The QR module is at 80%. I should have it done by Wednesday.', timestamp: '10:02:30', sentiment: 'positive', agendaId: 'ag-1' },
-        { id: 't-4', speaker: 'Dr. Sharma', text: 'Great progress. Now let\'s move to the dashboard demo. Kiran, you\'re up.', timestamp: '10:03:00', sentiment: 'positive', agendaId: 'ag-2' },
-        { id: 't-5', speaker: 'Kiran M.', text: 'I\'ve implemented the three-column layout with the agenda panel, video area, and transcript feed. Let me share my screen.', timestamp: '10:03:30', sentiment: 'neutral', agendaId: 'ag-2' },
-        { id: 't-6', speaker: 'Priya S.', text: 'This looks really polished. One concern — the sentiment badges might be noisy for long meetings.', timestamp: '10:05:00', sentiment: 'neutral', agendaId: 'ag-2' },
-        { id: 't-7', speaker: 'Dr. Sharma', text: 'Good point. Let\'s add a filter toggle for sentiment visibility. Can we add that as an action item?', timestamp: '10:05:30', sentiment: 'positive', agendaId: 'ag-2' },
+        { id: 't-1', speaker: 'Dr. Sharma', text: "Let's start with the sprint review.", timestamp: '10:01:12', sentiment: 'neutral', agendaId: 'ag-1' },
+        { id: 't-2', speaker: 'Ravi K.', text: 'I completed the QR module integration.', timestamp: '10:03:45', sentiment: 'positive', agendaId: 'ag-1' },
     ],
 };
 
 const actionItems = {
     'mtg-001': [
-        { id: 'ai-1', title: 'Complete QR attendance module', assignee: 'Ananya P.', category: 'Technical', status: 'in-progress', deadline: '2026-03-08', agendaId: 'ag-1' },
-        { id: 'ai-2', title: 'Add sentiment filter toggle to dashboard', assignee: 'Kiran M.', category: 'Technical', status: 'pending', deadline: '2026-03-10', agendaId: 'ag-2' },
-        { id: 'ai-3', title: 'Finalize API documentation for v2 endpoints', assignee: 'Ravi K.', category: 'Administrative', status: 'pending', deadline: '2026-03-09', agendaId: 'ag-3' },
-        { id: 'ai-4', title: 'Schedule follow-up with design team', assignee: 'Dr. Sharma', category: 'Follow-up', status: 'pending', deadline: '2026-03-07', agendaId: 'ag-4' },
-        { id: 'ai-5', title: 'Review notification service architecture', assignee: 'Priya S.', category: 'Decision', status: 'completed', deadline: '2026-03-05', agendaId: 'ag-3' },
+        { id: 'ai-1', title: 'Complete QR module', assignee: 'Ananya P.', category: 'Technical', status: 'in-progress', deadline: '2026-03-08', agendaId: 'ag-1' },
+        { id: 'ai-2', title: 'Write unit tests for agenda panel', assignee: 'Kiran M.', category: 'Technical', status: 'pending', deadline: '2026-03-09', agendaId: 'ag-2' },
     ],
-};
-
-const polls = {
-    'mtg-001': {
-        question: 'Best time for next sprint review?',
-        options: [
-            { label: 'Monday 10:00 AM', votes: 3 },
-            { label: 'Tuesday 2:00 PM', votes: 5 },
-            { label: 'Wednesday 11:00 AM', votes: 2 },
-            { label: 'Thursday 4:00 PM', votes: 1 },
-            { label: 'Friday 9:00 AM', votes: 4 },
-        ],
-    },
 };
 
 const dashboardStats = {
-    user: 'Kiran M.',
-    role: 'Host',
-    streak: 7,
-    totalMeetings: 42,
-    totalHours: 63.5,
-    punctualityRate: 94,
-    tasksCompleted: 28,
-    tasksTotal: 32,
+    user: 'Kiran M.', role: 'Host', streak: 7, totalMeetings: 42,
+    totalHours: 63.5, punctualityRate: 94, tasksCompleted: 28, tasksTotal: 32,
     badges: [
-        { name: 'Action Hero', icon: '🏆', description: 'Completed 90%+ tasks on time' },
-        { name: 'Streak Master', icon: '🔥', description: '7 consecutive on-time meetings' },
-        { name: 'Key Contributor', icon: '⭐', description: 'Awarded by Prof. Reddy' },
-        { name: 'Early Bird', icon: '🐦', description: 'Joined 5+ meetings before start time' },
+        { name: 'Action Hero', icon: '🏆', description: '90%+ tasks on time' },
+        { name: '7-Day Streak', icon: '🔥', description: '7 consecutive on-time meetings' },
     ],
     weeklyHeatmap: [
-        { day: 'Mon', hours: 3.5 },
-        { day: 'Tue', hours: 5.0 },
-        { day: 'Wed', hours: 2.0 },
-        { day: 'Thu', hours: 4.5 },
-        { day: 'Fri', hours: 1.5 },
+        { day: 'Mon', hours: 3.5 }, { day: 'Tue', hours: 5.0 }, { day: 'Wed', hours: 2.0 },
+        { day: 'Thu', hours: 4.5 }, { day: 'Fri', hours: 3.0 },
     ],
-    monthlyAttendance: [
-        { week: 'W1', attended: 5, total: 6 },
-        { week: 'W2', attended: 4, total: 4 },
-        { week: 'W3', attended: 6, total: 7 },
-        { week: 'W4', attended: 5, total: 5 },
-    ],
+    monthlyAttendance: [{ week: 'W1', attended: 5, total: 6 }, { week: 'W2', attended: 6, total: 6 }],
     sentimentProfile: { positive: 62, neutral: 30, negative: 8 },
-    speakingTime: 18.5,
-    avgMeetingDuration: 45,
+    speakingTime: 18.5, avgMeetingDuration: 45,
 };
 
-// ─── API Routes ──────────────────────────────────────────────
+// ─── Protected API Routes ────────────────────────────────────
+app.get('/api/meetings', protect, (req, res) => res.json(meetings));
 
-app.get('/api/meetings', (req, res) => res.json(meetings));
-
-app.post('/api/meetings', (req, res) => {
+app.post('/api/meetings', protect, (req, res) => {
     const { title, modality, date, time } = req.body;
     const newMeeting = {
-        id: `mtg-${Date.now()}`,
-        title,
-        modality,
-        date,
-        time,
-        host: dashboardStats.user,
-        participants: [],
-        status: 'scheduled',
+        id: `mtg-${Date.now()}`, title, modality, date, time,
+        host: 'You', participants: [], status: 'scheduled',
         jitsiUrl: modality !== 'Offline' ? `https://meet.jit.si/mcms-${Date.now()}` : null,
     };
     meetings.push(newMeeting);
     res.status(201).json(newMeeting);
 });
 
-app.get('/api/agenda/:meetingId', (req, res) => {
-    const agenda = agendas[req.params.meetingId] || [];
-    res.json(agenda);
-});
+app.get('/api/agenda/:meetingId', protect, (req, res) => res.json(agendas[req.params.meetingId] || []));
+app.get('/api/transcript/:meetingId', protect, (req, res) => res.json(transcripts[req.params.meetingId] || []));
+app.get('/api/action-items/:meetingId', protect, (req, res) => res.json(actionItems[req.params.meetingId] || []));
 
-app.get('/api/transcript/:meetingId', (req, res) => {
-    const transcript = transcripts[req.params.meetingId] || [];
-    res.json(transcript);
-});
-
-app.get('/api/action-items/:meetingId', (req, res) => {
-    const items = actionItems[req.params.meetingId] || [];
-    res.json(items);
-});
-
-app.get('/api/dashboard/stats', (req, res) => res.json(dashboardStats));
-
-app.get('/api/polls/:meetingId', (req, res) => {
-    const poll = polls[req.params.meetingId] || null;
-    res.json(poll);
+app.get('/api/dashboard/stats', protect, (req, res) => {
+    const stats = { ...dashboardStats };
+    if (req.user && req.user.name) stats.user = req.user.name;
+    res.json(stats);
 });
 
 // ─── Start Server ────────────────────────────────────────────
-
 app.listen(PORT, () => {
     console.log(`✅ MCMS Backend running at http://localhost:${PORT}`);
+    console.log(`   MongoDB: ${usingMongo ? 'Connected' : 'Not running — users stored in-memory (lost on restart)'}`);
 });

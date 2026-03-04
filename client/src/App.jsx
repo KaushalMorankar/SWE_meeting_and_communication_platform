@@ -10,9 +10,16 @@ import LiveOutcome from './components/LiveOutcome';
 import MeetingCreation from './components/MeetingCreation';
 import ProductivityDashboard from './components/ProductivityDashboard';
 
+// Auth Pages
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import { useAuth } from './context/AuthContext';
+
 const API_BASE = 'http://localhost:5000/api';
 
-function App() {
+function DashboardApp() {
+  const { user, logout } = useAuth();
+
   const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
@@ -28,6 +35,18 @@ function App() {
   const [actionItems, setActionItems] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
+
+  // Helper for authenticated requests
+  const fetchWithAuth = async (url, options = {}) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+    if (user?.token) {
+      headers.Authorization = `Bearer ${user.token}`;
+    }
+    return fetch(url, { ...options, headers });
+  };
 
   // Fetch data on mount
   useEffect(() => {
@@ -55,69 +74,56 @@ function App() {
 
   const fetchMeetings = async () => {
     try {
-      const res = await fetch(`${API_BASE}/meetings`);
-      const data = await res.json();
-      setMeetings(data);
-      if (data.length > 0) setSelectedMeeting(data[0]);
-    } catch (err) {
-      console.error('Failed to fetch meetings:', err);
-    }
+      const res = await fetchWithAuth(`${API_BASE}/meetings`);
+      if (res.ok) {
+        const data = await res.json();
+        setMeetings(data);
+        if (data.length > 0) setSelectedMeeting(data[0]);
+      }
+    } catch (err) { console.error('Failed to fetch meetings:', err); }
   };
 
   const fetchAgenda = async (meetingId) => {
     try {
-      const res = await fetch(`${API_BASE}/agenda/${meetingId}`);
-      const data = await res.json();
-      setAgendaItems(data);
-    } catch (err) {
-      console.error('Failed to fetch agenda:', err);
-    }
+      const res = await fetchWithAuth(`${API_BASE}/agenda/${meetingId}`);
+      if (res.ok) setAgendaItems(await res.json());
+    } catch (err) { console.error('Failed to fetch agenda:', err); }
   };
 
   const fetchTranscript = async (meetingId) => {
     try {
-      const res = await fetch(`${API_BASE}/transcript/${meetingId}`);
-      const data = await res.json();
-      setTranscripts(data);
-    } catch (err) {
-      console.error('Failed to fetch transcript:', err);
-    }
+      const res = await fetchWithAuth(`${API_BASE}/transcript/${meetingId}`);
+      if (res.ok) setTranscripts(await res.json());
+    } catch (err) { console.error('Failed to fetch transcript:', err); }
   };
 
   const fetchActionItems = async (meetingId) => {
     try {
-      const res = await fetch(`${API_BASE}/action-items/${meetingId}`);
-      const data = await res.json();
-      setActionItems(data);
-    } catch (err) {
-      console.error('Failed to fetch action items:', err);
-    }
+      const res = await fetchWithAuth(`${API_BASE}/action-items/${meetingId}`);
+      if (res.ok) setActionItems(await res.json());
+    } catch (err) { console.error('Failed to fetch action items:', err); }
   };
 
   const fetchDashboardStats = async () => {
     try {
-      const res = await fetch(`${API_BASE}/dashboard/stats`);
-      const data = await res.json();
-      setDashboardStats(data);
-    } catch (err) {
-      console.error('Failed to fetch dashboard stats:', err);
-    }
+      const res = await fetchWithAuth(`${API_BASE}/dashboard/stats`);
+      if (res.ok) setDashboardStats(await res.json());
+    } catch (err) { console.error('Failed to fetch dashboard stats:', err); }
   };
 
   const handleCreateMeeting = async (meetingData) => {
     try {
-      const res = await fetch(`${API_BASE}/meetings`, {
+      const res = await fetchWithAuth(`${API_BASE}/meetings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(meetingData),
       });
-      const newMeeting = await res.json();
-      setMeetings(prev => [...prev, newMeeting]);
-      setSelectedMeeting(newMeeting);
-      setCurrentView('meeting');
-    } catch (err) {
-      console.error('Failed to create meeting:', err);
-    }
+      if (res.ok) {
+        const newMeeting = await res.json();
+        setMeetings(prev => [...prev, newMeeting]);
+        setSelectedMeeting(newMeeting);
+        setCurrentView('meeting');
+      }
+    } catch (err) { console.error('Failed to create meeting:', err); }
   };
 
   const renderContent = () => {
@@ -132,19 +138,8 @@ function App() {
       case 'meeting':
         return (
           <div className="meeting-layout">
-            {/* Left: Agenda Panel */}
-            <AgendaPanel
-              agendaItems={agendaItems}
-              onItemChange={setAgendaItems}
-            />
-
-            {/* Center: Video Area */}
-            <VideoArea
-              meetingTitle={selectedMeeting?.title || 'Select a Meeting'}
-              participants={selectedMeeting?.participants || []}
-            />
-
-            {/* Right: Transcript + Action Items */}
+            <AgendaPanel agendaItems={agendaItems} onItemChange={setAgendaItems} />
+            <VideoArea meetingTitle={selectedMeeting?.title || 'Select a Meeting'} participants={selectedMeeting?.participants || []} />
             <div className="panel" style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)' }}>
               <TranscriptFeed transcripts={transcripts} />
               <ActionItems items={actionItems} />
@@ -163,7 +158,6 @@ function App() {
                   key={meeting.id}
                   className={`meeting-card glass-card ${selectedMeeting?.id === meeting.id ? 'selected' : ''}`}
                   onClick={() => { setSelectedMeeting(meeting); setCurrentView('meeting'); }}
-                  id={`meeting-card-${meeting.id}`}
                   style={selectedMeeting?.id === meeting.id ? { borderColor: 'rgba(79, 142, 247, 0.3)' } : {}}
                 >
                   <div className="meeting-card-title">{meeting.title}</div>
@@ -191,45 +185,26 @@ function App() {
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
               Search and browse past meeting transcripts, summaries, and action items.
             </p>
-            <div style={{ marginBottom: '16px' }}>
-              <input type="text" className="input" placeholder="🔍 Search by agenda title, keyword, or action item..." id="archive-search" />
-            </div>
             <div className="meeting-list">
               {meetings.filter(m => m.status === 'completed').map(meeting => (
-                <div key={meeting.id} className="meeting-card glass-card" id={`archive-${meeting.id}`}>
+                <div key={meeting.id} className="meeting-card glass-card">
                   <div className="meeting-card-title">{meeting.title}</div>
                   <div className="meeting-card-meta">
                     <span>📅 {meeting.date}</span>
                     <span>👤 {meeting.host}</span>
                     <span className="chip chip-emerald">Completed</span>
                   </div>
-                  <div style={{ marginTop: '10px', padding: '10px', background: 'var(--bg-glass)', borderRadius: 'var(--radius-sm)', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    <strong>Quick Summary:</strong> Meeting covered evaluation of frontend role candidate. Key decisions documented with transcript segments linked.
-                  </div>
                 </div>
               ))}
-              {meetings.filter(m => m.status === 'completed').length === 0 && (
-                <div className="empty-state">
-                  <p>No completed meetings in the archive yet.</p>
-                </div>
-              )}
             </div>
           </div>
         );
 
       case 'analytics':
-        return (
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <ProductivityDashboard stats={dashboardStats} />
-          </div>
-        );
+        return <div style={{ flex: 1, overflow: 'hidden' }}><ProductivityDashboard stats={dashboardStats} /></div>;
 
       default:
-        return (
-          <div className="empty-state" style={{ flex: 1 }}>
-            <p>Select a view from the sidebar</p>
-          </div>
-        );
+        return <div className="empty-state" style={{ flex: 1 }}><p>Select a view from the sidebar</p></div>;
     }
   };
 
@@ -237,12 +212,13 @@ function App() {
     <div className="app-container">
       <TopBar
         streak={dashboardStats?.streak || 0}
-        userName={dashboardStats?.user || 'User'}
+        userName={user?.name || dashboardStats?.user || 'User'}
         onNewMeeting={() => setShowCreateMeeting(true)}
         theme={theme}
         onToggleTheme={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
         sidebarCollapsed={sidebarCollapsed}
         onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onLogout={logout}
       />
 
       <div className="main-area">
@@ -250,6 +226,7 @@ function App() {
           currentView={currentView}
           onViewChange={setCurrentView}
           collapsed={sidebarCollapsed}
+          onLogout={logout}
         />
 
         <div className="content-area">
@@ -267,4 +244,25 @@ function App() {
   );
 }
 
-export default App;
+// Main App component that maps auth states to the correct UI
+export default function App() {
+  const { user, loading } = useAuth();
+  const [authView, setAuthView] = useState('login'); // 'login' or 'signup'
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--accent-blue)', fontSize: '24px' }}>⌘ MCMS Loading...</div>
+      </div>
+    );
+  }
+
+  // If not authenticated, show login or signup pages
+  if (!user) {
+    if (authView === 'login') return <Login onNavigate={setAuthView} />;
+    if (authView === 'signup') return <Signup onNavigate={setAuthView} />;
+  }
+
+  // If authenticated, show the main dashboard
+  return <DashboardApp />;
+}

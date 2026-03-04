@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import Icon from './Icon';
 import {
-  Search01Icon,
-  Notification01Icon,
-  FireIcon,
-  ArrowDown01Icon,
-  UserIcon,
-  Moon01Icon,
-  Sun01Icon,
-  Add01Icon,
+    Search01Icon,
+    Notification01Icon,
+    FireIcon,
+    ArrowDown01Icon,
+    UserIcon,
+    Moon01Icon,
+    Sun01Icon,
+    Add01Icon,
+    Logout01Icon,
 } from '@hugeicons/core-free-icons';
 
 function SidebarToggleIcon({ collapsed }) {
@@ -20,8 +21,9 @@ function SidebarToggleIcon({ collapsed }) {
     );
 }
 
-export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark', onToggleTheme, sidebarCollapsed, onSidebarToggle }) {
+export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark', onToggleTheme, sidebarCollapsed, onSidebarToggle, onLogout }) {
     const [showNotif, setShowNotif] = useState(false);
+    const [showUserMenu, setShowUserMenu] = useState(false);
 
     return (
         <header className="topbar">
@@ -60,12 +62,41 @@ export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark',
                     <span className="notif-dot"></span>
                 </button>
 
-                <div className="user-menu">
-                    <div className="user-avatar">
-                        <Icon icon={UserIcon} size={18} />
+                <div className="user-profile" style={{ position: 'relative' }}>
+                    <div
+                        className="user-menu"
+                        onClick={() => setShowUserMenu(!showUserMenu)}
+                        style={{ cursor: 'pointer' }}
+                    >
+                        <div className="user-avatar">
+                            <Icon icon={UserIcon} size={18} />
+                        </div>
+                        <span className="user-name">{userName}</span>
+                        <Icon icon={ArrowDown01Icon} size={14} />
                     </div>
-                    <span className="user-name">{userName}</span>
-                    <Icon icon={ArrowDown01Icon} size={14} />
+
+                    {showUserMenu && (
+                        <div className="glass-card" style={{
+                            position: 'absolute', right: 0, top: '48px', width: '200px',
+                            padding: '8px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '4px'
+                        }}>
+                            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-glass)', marginBottom: '4px' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 600 }}>{userName}</div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Host Account</div>
+                            </div>
+                            <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'flex-start', border: 'none' }}>Profile Settings</button>
+                            {onLogout && (
+                                <button
+                                    className="btn btn-secondary"
+                                    style={{ width: '100%', justifyContent: 'flex-start', color: 'var(--accent-rose)', border: 'none' }}
+                                    onClick={onLogout}
+                                >
+                                    <Icon icon={Logout01Icon} size={16} />
+                                    <span style={{ marginLeft: '8px' }}>Logout</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <button
