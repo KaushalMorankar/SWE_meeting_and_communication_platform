@@ -1,31 +1,31 @@
-import { useState, useEffect } from 'react';
-import './index.css';
-import TopBar from './components/TopBar';
-import Sidebar from './components/Sidebar';
-import AgendaPanel from './components/AgendaPanel';
-import VideoArea from './components/VideoArea';
-import TranscriptFeed from './components/TranscriptFeed';
-import ActionItems from './components/ActionItems';
-import LiveOutcome from './components/LiveOutcome';
-import MeetingCreation from './components/MeetingCreation';
-import ProductivityDashboard from './components/ProductivityDashboard';
+import { useState, useEffect } from "react";
+import "./index.css";
+import TopBar from "./components/TopBar";
+import Sidebar from "./components/Sidebar";
+import AgendaPanel from "./components/AgendaPanel";
+import VideoArea from "./components/VideoArea";
+import TranscriptFeed from "./components/TranscriptFeed";
+import ActionItems from "./components/ActionItems";
+import LiveOutcome from "./components/LiveOutcome";
+import MeetingCreation from "./components/MeetingCreation";
+import ProductivityDashboard from "./components/ProductivityDashboard";
 
 // Auth Pages
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import { useAuth } from './context/AuthContext';
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import { useAuth } from "./context/AuthContext";
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = "http://localhost:5000/api";
 
 function DashboardApp() {
   const { user, logout } = useAuth();
 
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
   const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'dark';
-    return window.localStorage.getItem('theme') === 'light' ? 'light' : 'dark';
+    if (typeof window === "undefined") return "dark";
+    return window.localStorage.getItem("theme") === "light" ? "light" : "dark";
   });
 
   // Data state
@@ -39,8 +39,8 @@ function DashboardApp() {
   // Helper for authenticated requests
   const fetchWithAuth = async (url, options = {}) => {
     const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers
+      "Content-Type": "application/json",
+      ...options.headers,
     };
     if (user?.token) {
       headers.Authorization = `Bearer ${user.token}`;
@@ -56,11 +56,11 @@ function DashboardApp() {
 
   // Apply theme to document root
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.setAttribute('data-theme', theme);
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-theme", theme);
     }
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('theme', theme);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("theme", theme);
     }
   }, [theme]);
 
@@ -80,67 +80,95 @@ function DashboardApp() {
         setMeetings(data);
         if (data.length > 0) setSelectedMeeting(data[0]);
       }
-    } catch (err) { console.error('Failed to fetch meetings:', err); }
+    } catch (err) {
+      console.error("Failed to fetch meetings:", err);
+    }
   };
 
   const fetchAgenda = async (meetingId) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/agenda/${meetingId}`);
       if (res.ok) setAgendaItems(await res.json());
-    } catch (err) { console.error('Failed to fetch agenda:', err); }
+    } catch (err) {
+      console.error("Failed to fetch agenda:", err);
+    }
   };
 
   const fetchTranscript = async (meetingId) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/transcript/${meetingId}`);
       if (res.ok) setTranscripts(await res.json());
-    } catch (err) { console.error('Failed to fetch transcript:', err); }
+    } catch (err) {
+      console.error("Failed to fetch transcript:", err);
+    }
   };
 
   const fetchActionItems = async (meetingId) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/action-items/${meetingId}`);
       if (res.ok) setActionItems(await res.json());
-    } catch (err) { console.error('Failed to fetch action items:', err); }
+    } catch (err) {
+      console.error("Failed to fetch action items:", err);
+    }
   };
 
   const fetchDashboardStats = async () => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/dashboard/stats`);
       if (res.ok) setDashboardStats(await res.json());
-    } catch (err) { console.error('Failed to fetch dashboard stats:', err); }
+    } catch (err) {
+      console.error("Failed to fetch dashboard stats:", err);
+    }
   };
 
   const handleCreateMeeting = async (meetingData) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/meetings`, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify(meetingData),
       });
       if (res.ok) {
         const newMeeting = await res.json();
-        setMeetings(prev => [...prev, newMeeting]);
+        setMeetings((prev) => [...prev, newMeeting]);
         setSelectedMeeting(newMeeting);
-        setCurrentView('meeting');
+        setCurrentView("meeting");
       }
-    } catch (err) { console.error('Failed to create meeting:', err); }
+    } catch (err) {
+      console.error("Failed to create meeting:", err);
+    }
   };
 
   const renderContent = () => {
     switch (currentView) {
-      case 'dashboard':
+      case "dashboard":
         return (
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: "hidden" }}>
             <ProductivityDashboard stats={dashboardStats} />
           </div>
         );
 
-      case 'meeting':
+      case "meeting":
         return (
           <div className="meeting-layout">
-            <AgendaPanel agendaItems={agendaItems} onItemChange={setAgendaItems} />
-            <VideoArea meetingTitle={selectedMeeting?.title || 'Select a Meeting'} participants={selectedMeeting?.participants || []} />
-            <div className="panel" style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)' }}>
+            <AgendaPanel
+              agendaItems={agendaItems}
+              onItemChange={setAgendaItems}
+            />
+            <VideoArea
+              meetingTitle={selectedMeeting?.title || "Select a Meeting"}
+              participants={selectedMeeting?.participants || []}
+              jitsiRoomName={selectedMeeting?.jitsiRoomName}
+              modality={selectedMeeting?.modality}
+              currentUser={user}
+            />
+            <div
+              className="panel"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                background: "var(--bg-card)",
+              }}
+            >
               <TranscriptFeed transcripts={transcripts} />
               <ActionItems items={actionItems} />
               <LiveOutcome />
@@ -148,27 +176,46 @@ function DashboardApp() {
           </div>
         );
 
-      case 'schedule':
+      case "schedule":
         return (
-          <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-            <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '16px' }}>Scheduled Meetings</h2>
+          <div style={{ flex: 1, overflow: "auto", padding: "24px" }}>
+            <h2
+              style={{
+                fontSize: "22px",
+                fontWeight: 700,
+                marginBottom: "16px",
+              }}
+            >
+              Scheduled Meetings
+            </h2>
             <div className="meeting-list">
               {meetings.map((meeting) => (
                 <div
                   key={meeting.id}
-                  className={`meeting-card glass-card ${selectedMeeting?.id === meeting.id ? 'selected' : ''}`}
-                  onClick={() => { setSelectedMeeting(meeting); setCurrentView('meeting'); }}
-                  style={selectedMeeting?.id === meeting.id ? { borderColor: 'rgba(79, 142, 247, 0.3)' } : {}}
+                  className={`meeting-card glass-card ${selectedMeeting?.id === meeting.id ? "selected" : ""}`}
+                  onClick={() => {
+                    setSelectedMeeting(meeting);
+                    setCurrentView("meeting");
+                  }}
+                  style={
+                    selectedMeeting?.id === meeting.id
+                      ? { borderColor: "rgba(79, 142, 247, 0.3)" }
+                      : {}
+                  }
                 >
                   <div className="meeting-card-title">{meeting.title}</div>
                   <div className="meeting-card-meta">
-                    <span className={`chip ${meeting.modality === 'Online' ? 'chip-blue' : meeting.modality === 'Hybrid' ? 'chip-violet' : 'chip-emerald'}`}>
+                    <span
+                      className={`chip ${meeting.modality === "Online" ? "chip-blue" : meeting.modality === "Hybrid" ? "chip-violet" : "chip-emerald"}`}
+                    >
                       {meeting.modality}
                     </span>
                     <span>📅 {meeting.date}</span>
                     <span>🕐 {meeting.time}</span>
                     <span>👤 {meeting.host}</span>
-                    <span className={`chip ${meeting.status === 'completed' ? 'chip-emerald' : 'chip-amber'}`}>
+                    <span
+                      className={`chip ${meeting.status === "completed" ? "chip-emerald" : "chip-amber"}`}
+                    >
                       {meeting.status}
                     </span>
                   </div>
@@ -178,33 +225,54 @@ function DashboardApp() {
           </div>
         );
 
-      case 'archive':
+      case "archive":
         return (
-          <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-            <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>Meeting Archives</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
-              Search and browse past meeting transcripts, summaries, and action items.
+          <div style={{ flex: 1, overflow: "auto", padding: "24px" }}>
+            <h2
+              style={{ fontSize: "22px", fontWeight: 700, marginBottom: "8px" }}
+            >
+              Meeting Archives
+            </h2>
+            <p
+              style={{
+                fontSize: "13px",
+                color: "var(--text-muted)",
+                marginBottom: "20px",
+              }}
+            >
+              Search and browse past meeting transcripts, summaries, and action
+              items.
             </p>
             <div className="meeting-list">
-              {meetings.filter(m => m.status === 'completed').map(meeting => (
-                <div key={meeting.id} className="meeting-card glass-card">
-                  <div className="meeting-card-title">{meeting.title}</div>
-                  <div className="meeting-card-meta">
-                    <span>📅 {meeting.date}</span>
-                    <span>👤 {meeting.host}</span>
-                    <span className="chip chip-emerald">Completed</span>
+              {meetings
+                .filter((m) => m.status === "completed")
+                .map((meeting) => (
+                  <div key={meeting.id} className="meeting-card glass-card">
+                    <div className="meeting-card-title">{meeting.title}</div>
+                    <div className="meeting-card-meta">
+                      <span>📅 {meeting.date}</span>
+                      <span>👤 {meeting.host}</span>
+                      <span className="chip chip-emerald">Completed</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         );
 
-      case 'analytics':
-        return <div style={{ flex: 1, overflow: 'hidden' }}><ProductivityDashboard stats={dashboardStats} /></div>;
+      case "analytics":
+        return (
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <ProductivityDashboard stats={dashboardStats} />
+          </div>
+        );
 
       default:
-        return <div className="empty-state" style={{ flex: 1 }}><p>Select a view from the sidebar</p></div>;
+        return (
+          <div className="empty-state" style={{ flex: 1 }}>
+            <p>Select a view from the sidebar</p>
+          </div>
+        );
     }
   };
 
@@ -212,10 +280,12 @@ function DashboardApp() {
     <div className="app-container">
       <TopBar
         streak={dashboardStats?.streak || 0}
-        userName={user?.name || dashboardStats?.user || 'User'}
+        userName={user?.name || dashboardStats?.user || "User"}
         onNewMeeting={() => setShowCreateMeeting(true)}
         theme={theme}
-        onToggleTheme={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+        onToggleTheme={() =>
+          setTheme((prev) => (prev === "dark" ? "light" : "dark"))
+        }
         sidebarCollapsed={sidebarCollapsed}
         onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         onLogout={logout}
@@ -229,9 +299,7 @@ function DashboardApp() {
           onLogout={logout}
         />
 
-        <div className="content-area">
-          {renderContent()}
-        </div>
+        <div className="content-area">{renderContent()}</div>
       </div>
 
       {showCreateMeeting && (
@@ -247,20 +315,30 @@ function DashboardApp() {
 // Main App component that maps auth states to the correct UI
 export default function App() {
   const { user, loading } = useAuth();
-  const [authView, setAuthView] = useState('login'); // 'login' or 'signup'
+  const [authView, setAuthView] = useState("login"); // 'login' or 'signup'
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
-        <div style={{ color: 'var(--accent-blue)', fontSize: '24px' }}>⌘ MCMS Loading...</div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          background: "var(--bg-primary)",
+        }}
+      >
+        <div style={{ color: "var(--accent-blue)", fontSize: "24px" }}>
+          ⌘ MCMS Loading...
+        </div>
       </div>
     );
   }
 
   // If not authenticated, show login or signup pages
   if (!user) {
-    if (authView === 'login') return <Login onNavigate={setAuthView} />;
-    if (authView === 'signup') return <Signup onNavigate={setAuthView} />;
+    if (authView === "login") return <Login onNavigate={setAuthView} />;
+    if (authView === "signup") return <Signup onNavigate={setAuthView} />;
   }
 
   // If authenticated, show the main dashboard

@@ -12,6 +12,7 @@
   "dependencies": {
     "@hugeicons/core-free-icons": "^3.3.0",
     "@hugeicons/react": "^1.1.5",
+    "@jitsi/react-sdk": "^1.4.4",
     "chrono-node": "^2.9.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

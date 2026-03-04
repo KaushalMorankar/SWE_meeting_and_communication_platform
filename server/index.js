@@ -9,6 +9,7 @@ dotenv.config();
 // ── Optional MongoDB connection ──────────────────────────────
 let usingMongo = false;
 let User = null;
+let Meeting = null;
 try {
     const mongoose = require('mongoose');
     mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/mcms_db')
@@ -18,6 +19,7 @@ try {
         })
         .catch(err => console.log('⚠️  MongoDB not available — using in-memory store:', err.message));
     User = require('./models/User');
+    Meeting = require('./models/Meeting');
 } catch (e) {
     console.log('⚠️  Mongoose not found — using in-memory store');
 }
@@ -166,17 +168,78 @@ const dashboardStats = {
 };
 
 // ─── Protected API Routes ────────────────────────────────────
-app.get('/api/meetings', protect, (req, res) => res.json(meetings));
+app.get('/api/meetings', protect, async (req, res) => {
+    try {
+        if (usingMongo && Meeting) {
+            const dbMeetings = await Meeting.find({}).sort({ createdAt: -1 });
+            const formatted = dbMeetings.map(m => ({
+                id: m._id,
+                title: m.title,
+                modality: m.modality,
+                date: m.date,
+                time: m.time,
+                host: m.host || 'Unknown',
+                participants: m.participants,
+                status: m.status,
+                jitsiUrl: m.jitsiUrl,
+                jitsiRoomName: m.jitsiRoomName
+            }));
+            // Return DB meetings mixed with mock data so frontend UI isn't empty
+            return res.json([...formatted, ...meetings]);
+        }
+        res.json(meetings);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
 
-app.post('/api/meetings', protect, (req, res) => {
-    const { title, modality, date, time } = req.body;
-    const newMeeting = {
-        id: `mtg-${Date.now()}`, title, modality, date, time,
-        host: 'You', participants: [], status: 'scheduled',
-        jitsiUrl: modality !== 'Offline' ? `https://meet.jit.si/mcms-${Date.now()}` : null,
-    };
-    meetings.push(newMeeting);
-    res.status(201).json(newMeeting);
+app.post('/api/meetings', protect, async (req, res) => {
+    try {
+        const { title, modality, date, time } = req.body;
+        // Generate unique Jitsi room name
+        const jitsiRoomName = modality !== 'Offline' ? `MCMS-${req.user.id.substring(req.user.id.length - 6)}-${Date.now()}` : null;
+        const jitsiUrl = jitsiRoomName ? `https://meet.jit.si/${jitsiRoomName}` : null;
+        let hostName = 'You';
+
+        if (usingMongo && User) {
+            const userDoc = await User.findById(req.user.id);
+            if (userDoc) hostName = userDoc.name;
+        }
+
+        if (usingMongo && Meeting) {
+            const newMeeting = await Meeting.create({
+                title, modality, date, time, 
+                host: hostName, 
+                hostId: req.user.id,
+                jitsiUrl, 
+                jitsiRoomName, 
+                participants: [], 
+                status: 'scheduled'
+            });
+            return res.status(201).json({
+                id: newMeeting._id,
+                title: newMeeting.title,
+                modality: newMeeting.modality,
+                date: newMeeting.date,
+                time: newMeeting.time,
+                host: newMeeting.host,
+                participants: newMeeting.participants,
+                status: newMeeting.status,
+                jitsiUrl: newMeeting.jitsiUrl,
+                jitsiRoomName: newMeeting.jitsiRoomName
+            });
+        }
+
+        const newMeeting = {
+            id: `mtg-${Date.now()}`, title, modality, date, time,
+            host: hostName, participants: [], status: 'scheduled',
+            jitsiUrl, jitsiRoomName
+        };
+        meetings.push(newMeeting);
+        res.status(201).json(newMeeting);
+    } catch(error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
 });
 
 app.get('/api/agenda/:meetingId', protect, (req, res) => res.json(agendas[req.params.meetingId] || []));
