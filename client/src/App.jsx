@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import "./index.css";
 import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
@@ -9,6 +9,11 @@ import ActionItems from "./components/ActionItems";
 import LiveOutcome from "./components/LiveOutcome";
 import MeetingCreation from "./components/MeetingCreation";
 import ProductivityDashboard from "./components/ProductivityDashboard";
+import PollVoting from "./components/PollVoting";
+import ProfileSettings from "./components/ProfileSettings";
+import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts";
+import Icon from "./components/Icon";
+import { Calendar02Icon, Clock01Icon, UserIcon } from "@hugeicons/core-free-icons";
 
 // Auth Pages
 import Login from "./pages/Login";
@@ -17,12 +22,21 @@ import { useAuth } from "./context/AuthContext";
 
 const API_BASE = "http://localhost:5001/api";
 
+const VIEW_KEYS = ['dashboard', 'meeting', 'schedule', 'archive', 'analytics', 'settings', 'profile'];
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  return `${d.getDate()} ${d.toLocaleString("en-US", { month: "short" })} ${d.getFullYear()}`;
+}
+
 function DashboardApp() {
   const { user, logout } = useAuth();
 
   const [currentView, setCurrentView] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
+  const [pollMeetingId, setPollMeetingId] = useState(null);
+  const searchInputRef = useRef(null);
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     return window.localStorage.getItem("theme") === "light" ? "light" : "dark";
@@ -35,6 +49,22 @@ function DashboardApp() {
   const [actionItems, setActionItems] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
+
+  const shortcuts = useMemo(() => [
+    { key: 'k', mod: true, handler: () => searchInputRef.current?.focus(), allowInInput: true },
+    { key: 'b', mod: true, handler: () => setSidebarCollapsed(prev => !prev), allowInInput: true },
+    { key: 'M', shift: true, handler: () => setShowCreateMeeting(true) },
+    { key: 'd', handler: () => setTheme(prev => prev === 'dark' ? 'light' : 'dark') },
+    { key: 'Escape', handler: () => {
+      if (pollMeetingId) setPollMeetingId(null);
+    }, allowInInput: true },
+    ...VIEW_KEYS.map((view, i) => ({
+      key: String(i + 1),
+      handler: () => setCurrentView(view),
+    })),
+  ], [pollMeetingId]);
+
+  useKeyboardShortcuts(shortcuts);
 
   // Helper for authenticated requests
   const fetchWithAuth = async (url, options = {}) => {
@@ -129,13 +159,14 @@ function DashboardApp() {
       });
       if (res.ok) {
         const newMeeting = await res.json();
-        setMeetings((prev) => [...prev, newMeeting]);
+        setMeetings((prev) => [newMeeting, ...prev]);
         setSelectedMeeting(newMeeting);
-        setCurrentView("meeting");
+        return newMeeting;
       }
     } catch (err) {
       console.error("Failed to create meeting:", err);
     }
+    return null;
   };
 
   const renderContent = () => {
@@ -210,14 +241,23 @@ function DashboardApp() {
                     >
                       {meeting.modality}
                     </span>
-                    <span>📅 {meeting.date}</span>
-                    <span>🕐 {meeting.time}</span>
-                    <span>👤 {meeting.host}</span>
+                    {meeting.date && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.date)}</span>}
+                    {meeting.time && <span><Icon icon={Clock01Icon} size={14} /> {meeting.time}</span>}
+                    <span><Icon icon={UserIcon} size={14} /> {meeting.host}</span>
                     <span
-                      className={`chip ${meeting.status === "completed" ? "chip-emerald" : "chip-amber"}`}
+                      className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}
                     >
-                      {meeting.status}
+                      {meeting.status === "pending_poll" ? "Poll Open" : meeting.status}
                     </span>
+                    {meeting.status === "pending_poll" && meeting.pollId && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        style={{ marginLeft: 'auto' }}
+                        onClick={(e) => { e.stopPropagation(); setPollMeetingId(meeting.id); }}
+                      >
+                        Vote
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -250,8 +290,8 @@ function DashboardApp() {
                   <div key={meeting.id} className="meeting-card glass-card">
                     <div className="meeting-card-title">{meeting.title}</div>
                     <div className="meeting-card-meta">
-                      <span>📅 {meeting.date}</span>
-                      <span>👤 {meeting.host}</span>
+                      <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.date)}</span>
+                      <span><Icon icon={UserIcon} size={14} /> {meeting.host}</span>
                       <span className="chip chip-emerald">Completed</span>
                     </div>
                   </div>
@@ -264,6 +304,13 @@ function DashboardApp() {
         return (
           <div style={{ flex: 1, overflow: "hidden" }}>
             <ProductivityDashboard stats={dashboardStats} userName={user?.name} />
+          </div>
+        );
+
+      case "profile":
+        return (
+          <div style={{ flex: 1, overflow: "auto" }}>
+            <ProfileSettings />
           </div>
         );
 
@@ -289,6 +336,9 @@ function DashboardApp() {
         sidebarCollapsed={sidebarCollapsed}
         onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         onLogout={logout}
+        onOpenPoll={(meetingId) => setPollMeetingId(meetingId)}
+        searchInputRef={searchInputRef}
+        onViewChange={setCurrentView}
       />
 
       <div className="main-area">
@@ -306,6 +356,13 @@ function DashboardApp() {
         <MeetingCreation
           onClose={() => setShowCreateMeeting(false)}
           onSubmit={handleCreateMeeting}
+        />
+      )}
+
+      {pollMeetingId && (
+        <PollVoting
+          meetingId={pollMeetingId}
+          onClose={() => setPollMeetingId(null)}
         />
       )}
     </div>

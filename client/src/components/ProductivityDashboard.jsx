@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Icon from './Icon';
 import {
     ChartIncreaseIcon,
@@ -11,8 +11,28 @@ import {
     Calendar02Icon,
 } from '@hugeicons/core-free-icons';
 
+const TABS = ['overview', 'attendance', 'engagement'];
+
 export default function ProductivityDashboard({ stats, userName }) {
     const [activeTab, setActiveTab] = useState('overview');
+
+    const handleTab = useCallback((e) => {
+        if (e.key !== 'Tab' || e.altKey || e.metaKey || e.ctrlKey) return;
+
+        const tag = document.activeElement?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (document.activeElement?.isContentEditable) return;
+        if (document.querySelector('.modal-overlay, .meeting-creation-overlay')) return;
+
+        e.preventDefault();
+        const dir = e.shiftKey ? -1 : 1;
+        setActiveTab(prev => TABS[(TABS.indexOf(prev) + dir + TABS.length) % TABS.length]);
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('keydown', handleTab);
+        return () => window.removeEventListener('keydown', handleTab);
+    }, [handleTab]);
 
     if (!stats) return null;
 
@@ -22,17 +42,17 @@ export default function ProductivityDashboard({ stats, userName }) {
         <div className="productivity-dashboard">
             <div className="dashboard-header">
                 <div>
-                    <h2 style={{ fontSize: '1.375rem', fontWeight: 700, marginBottom: '0.25rem' }}>
+                    <h2 style={{ fontSize: 'var(--font-size-title3)', fontWeight: 700, marginBottom: 'var(--lk-size-2xs)', letterSpacing: '-0.022em' }}>
                         Productivity Dashboard
                     </h2>
-                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    <p style={{ fontSize: 'var(--font-size-body)', color: 'var(--text-muted)', marginBottom: 'calc(var(--lk-size-sm) * var(--font-size-title3)/1rem)' }}>
                         Welcome back, <strong>{userName || stats.user}</strong>. Here's your meeting intelligence overview.
                     </p>
                 </div>
             </div>
 
-            <div className="tabs" style={{ margin: '0 1.25rem' }}>
-                {['overview', 'attendance', 'engagement'].map(tab => (
+            <div className="tabs" style={{ margin: '0 calc(var(--lk-size-lg) * var(--font-size-title3)/(1rem))' }}>
+                {TABS.map(tab => (
                     <button
                         key={tab}
                         className={`tab ${activeTab === tab ? 'active' : ''}`}
@@ -47,7 +67,7 @@ export default function ProductivityDashboard({ stats, userName }) {
             {activeTab === 'overview' && (
                 <div className="dashboard-grid">
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Icon icon={Calendar02Icon} size={18} style={{ color: 'var(--primary)' }} />
                             <span className="stat-label">Meetings Attended</span>
                         </div>
@@ -55,7 +75,7 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Icon icon={Clock01Icon} size={18} style={{ color: 'var(--accent-violet)' }} />
                             <span className="stat-label">Total Hours</span>
                         </div>
@@ -63,7 +83,7 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Icon icon={ChartIncreaseIcon} size={18} style={{ color: 'var(--accent-emerald)' }} />
                             <span className="stat-label">Punctuality Rate</span>
                         </div>
@@ -71,7 +91,7 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <Icon icon={CheckmarkSquare01Icon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Tasks Completed</span>
                         </div>
@@ -266,7 +286,8 @@ export default function ProductivityDashboard({ stats, userName }) {
           padding-bottom: 1.5rem;
         }
         .dashboard-header {
-          padding: 1.5rem 1.25rem 1rem;
+          padding: calc(var(--lk-size-lg) * var(--font-size-title3)/(1rem)) calc(var(--lk-size-lg) * var(--font-size-title3)/(1rem)) var(--lk-size-sm);
+		  padding-top: calc(var(--lk-size-lg) * var(--font-size-title3)/1.272rem);
         }
         .badges-grid {
           display: grid;

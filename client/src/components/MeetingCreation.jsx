@@ -8,8 +8,17 @@ import {
   Link01Icon,
   Delete02Icon,
   Clock01Icon,
+  Search01Icon,
+  UserIcon,
+  Copy01Icon,
+  Tick01Icon,
 } from '@hugeicons/core-free-icons';
 import * as chrono from 'chrono-node';
+import { useAuth } from '../context/AuthContext';
+
+const _raw = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+const API_BASE = _raw.endsWith('/api') ? _raw : `${_raw}/api`;
+const SERVER_BASE = API_BASE.replace(/\/api$/, '');
 
 function formatSlotDisplay(date) {
     const now = new Date();
@@ -32,8 +41,6 @@ function buildSuggestions(query) {
 
     if (!trimmed) {
         const suggestions = [];
-        const todayEnd = new Date(now);
-        todayEnd.setHours(23, 59, 59, 999);
         suggestions.push({
             label: 'Now',
             detail: `${now.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`,
@@ -65,9 +72,7 @@ function buildSuggestions(query) {
         seen.add(key);
 
         const hasTime = result.start.isCertain('hour');
-        const dayStr = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
         const timeStr = hasTime ? ` at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : '';
-
         const datePart = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long' });
         results.push({
             label: datePart,
@@ -93,7 +98,6 @@ function buildSuggestions(query) {
                 if (diff <= 0) diff += 7;
                 target.setDate(target.getDate() + diff + weekOffset * 7);
                 target.setHours(0, 0, 0, 0);
-
                 const weekLabel = weekOffset === 0 ? target.toLocaleDateString('en-US', { weekday: 'long' }) : `${target.toLocaleDateString('en-US', { weekday: 'long' })} in ${weekOffset === 1 ? 'one' : 'two'} week${weekOffset > 1 ? 's' : ''}`;
                 results.push({
                     label: weekLabel,
@@ -128,8 +132,10 @@ function buildSuggestions(query) {
 }
 
 export default function MeetingCreation({ onClose, onSubmit }) {
+    const { user } = useAuth();
     const [title, setTitle] = useState('');
     const [modality, setModality] = useState('Online');
+    const [location, setLocation] = useState('');
     const [slots, setSlots] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [suggestions, setSuggestions] = useState([]);
@@ -138,11 +144,34 @@ export default function MeetingCreation({ onClose, onSubmit }) {
     const [slotError, setSlotError] = useState(false);
     const [labelText, setLabelText] = useState('Scheduling Poll Slots');
     const [labelFading, setLabelFading] = useState(false);
+    const [closing, setClosing] = useState(false);
+
+    const handleClose = useCallback(() => {
+        if (closing) return;
+        setClosing(true);
+        setTimeout(() => onClose(), 300);
+    }, [closing, onClose]);
+
+    // Participant picker state
+    const [participants, setParticipants] = useState([]);
+    const [participantQuery, setParticipantQuery] = useState('');
+    const [userResults, setUserResults] = useState([]);
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
+    const [userHighlightIdx, setUserHighlightIdx] = useState(0);
+    const participantInputRef = useRef(null);
+    const participantDropdownRef = useRef(null);
+    const participantRowRef = useRef(null);
+    const [participantDropdownPos, setParticipantDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+
+    // Post-creation state
+    const [createdMeeting, setCreatedMeeting] = useState(null);
+    const [linkCopied, setLinkCopied] = useState(false);
 
     const inputRef = useRef(null);
     const inputRowRef = useRef(null);
     const dropdownRef = useRef(null);
     const labelTimerRef = useRef(null);
+    const searchTimerRef = useRef(null);
     const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
     const updateDropdownPos = useCallback(() => {
@@ -174,29 +203,77 @@ export default function MeetingCreation({ onClose, onSubmit }) {
         function handleClickOutside(e) {
             const inDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
             const inInputRow = inputRowRef.current && inputRowRef.current.contains(e.target);
-            if (!inDropdown && !inInputRow) {
-                closeDropdown();
-            }
+            if (!inDropdown && !inInputRow) closeDropdown();
+
+            const inUserDropdown = participantDropdownRef.current && participantDropdownRef.current.contains(e.target);
+            const inUserRow = participantRowRef.current && participantRowRef.current.contains(e.target);
+            if (!inUserDropdown && !inUserRow) setShowUserDropdown(false);
         }
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [closeDropdown]);
+
+    useEffect(() => {
+        function handleEscape(e) {
+            if (e.key === 'Escape' && !showDropdown && !showUserDropdown) {
+                handleClose();
+            }
+        }
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, [handleClose, showDropdown, showUserDropdown]);
+
+    const fetchParticipantSuggestions = useCallback(async (query) => {
+        try {
+            const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`, {
+                headers: { Authorization: `Bearer ${user?.token}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const filtered = data.filter(u => !participants.some(p => p._id === u._id));
+                setUserResults(filtered);
+                setShowUserDropdown(filtered.length > 0);
+                setUserHighlightIdx(0);
+                if (participantRowRef.current) {
+                    const rect = participantRowRef.current.getBoundingClientRect();
+                    setParticipantDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+                }
+            }
+        } catch { /* ignore */ }
+    }, [user?.token, participants]);
+
+    // Participant search with debounce — only when input is focused
+    useEffect(() => {
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+        if (document.activeElement !== participantInputRef.current) return;
+        searchTimerRef.current = setTimeout(() => fetchParticipantSuggestions(participantQuery), 200);
+        return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+    }, [participantQuery, fetchParticipantSuggestions]);
 
     const selectSuggestion = (suggestion) => {
         setSlots(prev => [...prev, { id: Date.now(), date: suggestion.date, display: formatSlotDisplay(suggestion.date) }]);
         setInputValue('');
         setShowDropdown(false);
         setSlotError(false);
-
         if (labelTimerRef.current) clearTimeout(labelTimerRef.current);
         setLabelFading(false);
         setLabelText('Scheduling Poll Slots');
-
         setTimeout(() => inputRef.current?.focus(), 50);
     };
 
     const removeSlot = (id) => {
         setSlots(prev => prev.filter(s => s.id !== id));
+    };
+
+    const addParticipant = (u) => {
+        setParticipants(prev => [...prev, u]);
+        setParticipantQuery('');
+        setShowUserDropdown(false);
+        setTimeout(() => participantInputRef.current?.focus(), 50);
+    };
+
+    const removeParticipant = (id) => {
+        setParticipants(prev => prev.filter(p => p._id !== id));
     };
 
     const handleKeyDown = (e) => {
@@ -215,11 +292,26 @@ export default function MeetingCreation({ onClose, onSubmit }) {
         }
     };
 
+    const handleParticipantKeyDown = (e) => {
+        if (!showUserDropdown || userResults.length === 0) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setUserHighlightIdx(prev => (prev + 1) % userResults.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setUserHighlightIdx(prev => (prev - 1 + userResults.length) % userResults.length);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            addParticipant(userResults[userHighlightIdx]);
+        } else if (e.key === 'Escape') {
+            setShowUserDropdown(false);
+        }
+    };
+
     const triggerSlotError = () => {
         setSlotError(true);
         setLabelFading(true);
         setLabelText('There must be at least one slot for a meeting');
-
         if (labelTimerRef.current) clearTimeout(labelTimerRef.current);
         labelTimerRef.current = setTimeout(() => {
             setLabelFading(true);
@@ -244,7 +336,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
         if (!showDropdown) openDropdown();
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const filledSlots = slots.filter(s => s.date);
         if (filledSlots.length === 0) {
@@ -252,25 +344,121 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             inputRef.current?.focus();
             return;
         }
-        onSubmit({
+        const meetingData = {
             title,
             modality,
+            location: (modality === 'Offline' || modality === 'Hybrid') ? location : undefined,
+            participants: participants.map(p => p._id),
             timeSlots: filledSlots.map(s => ({
                 date: s.date.toISOString().split('T')[0],
                 time: s.date.toTimeString().slice(0, 5),
             })),
-        });
-        onClose();
+        };
+        const result = await onSubmit(meetingData);
+        if (result) {
+            setCreatedMeeting(result);
+        }
     };
 
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2 className="modal-title">Create New Meeting</h2>
-                    <button className="btn-icon" onClick={onClose}>
+    const handleCopyLink = async () => {
+        if (!createdMeeting?.jitsiUrl) return;
+        try {
+            await navigator.clipboard.writeText(createdMeeting.jitsiUrl);
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        } catch { /* fallback handled by UI */ }
+    };
+
+    const renderAvatar = (u, size = 10) => {
+        if (u.profileImage) {
+            return <img src={`${SERVER_BASE}${u.profileImage}`} alt="" className="participant-chip-avatar-img" />;
+        }
+        return <Icon icon={UserIcon} size={size} />;
+    };
+
+    // Post-creation success view
+    if (createdMeeting) {
+        const hasJitsi = createdMeeting.jitsiUrl && modality !== 'Offline';
+        const isPoll = slots.length > 1;
+        return (
+            <div className={`modal-overlay${closing ? ' modal-closing' : ''}`} onClick={handleClose}>
+                <div className={`modal-content${closing ? ' modal-content-closing' : ''}`} onClick={(e) => e.stopPropagation()}>
+                    <button className="btn-icon modal-close-btn" onClick={handleClose}>
                         <Icon icon={Cancel01Icon} size={18} />
                     </button>
+                    <div className="modal-header">
+                        <h2 className="modal-title">Meeting Created</h2>
+                    </div>
+
+                    <div className="meeting-created-body">
+                        <div className="meeting-created-icon">
+                            <Icon icon={Calendar02Icon} size={28} />
+                        </div>
+                        <h3 className="meeting-created-title">{createdMeeting.title}</h3>
+                        <span className={`chip ${modality === 'Online' ? 'chip-blue' : modality === 'Hybrid' ? 'chip-violet' : 'chip-emerald'}`}
+                            style={{ alignSelf: 'center' }}>{modality}</span>
+
+                        {isPoll && (
+                            <div className="meeting-created-info">
+                                A scheduling poll has been sent to {participants.length} participant{participants.length !== 1 ? 's' : ''}.
+                                The meeting will be confirmed once a majority votes.
+                            </div>
+                        )}
+
+                        {!isPoll && createdMeeting.date && (
+                            <div className="meeting-created-info">
+                                Confirmed for <strong>{createdMeeting.date}</strong> at <strong>{createdMeeting.time}</strong>.
+                                {participants.length > 0 && ` RSVP emails sent to ${participants.length} participant${participants.length !== 1 ? 's' : ''}.`}
+                            </div>
+                        )}
+
+                        {hasJitsi && (
+                            <div className="jitsi-link-card">
+                                <div className="jitsi-link-label">
+                                    <Icon icon={Link01Icon} size={14} />
+                                    Meeting Link
+                                </div>
+                                <div className="jitsi-link-row">
+                                    <span className="jitsi-link-url">{createdMeeting.jitsiUrl}</span>
+                                    <button className={`btn btn-sm ${linkCopied ? 'btn-success' : 'btn-secondary'}`} onClick={handleCopyLink}>
+                                        <Icon icon={linkCopied ? Tick01Icon : Copy01Icon} size={14} />
+                                        {linkCopied ? 'Copied' : 'Copy'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {participants.length > 0 && (
+                            <div className="meeting-created-participants">
+                                <span className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>Participants</span>
+                                <div className="participant-chips">
+                                    {participants.map(p => (
+                                        <span key={p._id} className="participant-chip">
+                                            <span className="participant-chip-avatar">{renderAvatar(p)}</span>
+                                            {p.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                        <button className="btn btn-primary" onClick={handleClose}>Done</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={`modal-overlay${closing ? ' modal-closing' : ''}`} onClick={handleClose}>
+            <div className={`modal-content${closing ? ' modal-content-closing' : ''}`} onClick={(e) => e.stopPropagation()}>
+                <button className="btn-icon modal-close-btn" onClick={handleClose}>
+                    <Icon icon={Cancel01Icon} size={18} />
+                </button>
+                <div className="modal-header">
+                    <h2 className="modal-title">Create New Meeting</h2>
                 </div>
 
                 <form onSubmit={handleSubmit}>
@@ -283,6 +471,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             required
+                            autoFocus
                             id="input-meeting-title"
                         />
                     </div>
@@ -308,12 +497,19 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                     </div>
 
                     {modality === 'Online' && (
-                        <div className="form-group" style={{
-                            padding: '0', background: 'none',
-                            borderRadius: 'var(--radius-sm)', border: 'none'
-                        }}>
+                        <div className="form-group" style={{ padding: '0', background: 'none', borderRadius: 'var(--radius-sm)', border: 'none' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
-                                A Jitsi Meet URL will be auto-generated
+                                <Icon icon={Link01Icon} size={14} />
+                                A Jitsi Meet link will be auto-generated
+                            </div>
+                        </div>
+                    )}
+
+                    {modality === 'Hybrid' && (
+                        <div className="form-group" style={{ padding: '0', background: 'none', borderRadius: 'var(--radius-sm)', border: 'none' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
+                                <Icon icon={Link01Icon} size={14} />
+                                A Jitsi Meet link will be auto-generated
                             </div>
                         </div>
                     )}
@@ -325,10 +521,72 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                                 type="text"
                                 className="input"
                                 placeholder="e.g., Room 301, Academic Block A"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
                                 id="input-location"
                             />
                         </div>
                     )}
+
+                    {/* Participant Picker */}
+                    <div className="form-group">
+                        <label className="form-label">Participants</label>
+                        <div className="participant-picker-wrapper">
+                            {participants.length > 0 && (
+                                <div className="participant-chips">
+                                    {participants.map(p => (
+                                        <span key={p._id} className="participant-chip removable">
+                                            <span className="participant-chip-avatar">{renderAvatar(p)}</span>
+                                            {p.name}
+                                            <button type="button" className="participant-chip-remove" onClick={() => removeParticipant(p._id)}>
+                                                <Icon icon={Cancel01Icon} size={10} />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                            <div ref={participantRowRef} className="participant-search-row">
+                                <Icon icon={Search01Icon} size={14} className="nldate-icon" />
+                                <input
+                                    ref={participantInputRef}
+                                    type="text"
+                                    className="nldate-input"
+                                    placeholder="Search users by name or email..."
+                                    value={participantQuery}
+                                    onChange={(e) => setParticipantQuery(e.target.value)}
+                                    onFocus={() => fetchParticipantSuggestions(participantQuery)}
+                                    onBlur={() => setTimeout(() => setShowUserDropdown(false), 150)}
+                                    onKeyDown={handleParticipantKeyDown}
+                                    autoComplete="off"
+                                />
+                            </div>
+                        </div>
+
+                        {showUserDropdown && userResults.length > 0 && createPortal(
+                            <div
+                                ref={participantDropdownRef}
+                                className="nldate-dropdown"
+                                style={{ top: participantDropdownPos.top, left: participantDropdownPos.left, width: participantDropdownPos.width }}
+                            >
+                                {userResults.map((u, i) => (
+                                    <button
+                                        key={u._id}
+                                        type="button"
+                                        className={`nldate-option${i === userHighlightIdx ? ' highlighted' : ''}`}
+                                        onMouseEnter={() => setUserHighlightIdx(i)}
+                                        onClick={() => addParticipant(u)}
+                                    >
+                                        <span className="nldate-option-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span className="participant-chip-avatar">{renderAvatar(u, 12)}</span>
+                                            {u.name}
+                                        </span>
+                                        <span className="nldate-option-detail">{u.email}</span>
+                                    </button>
+                                ))}
+                            </div>,
+                            document.body
+                        )}
+                    </div>
 
                     <div className="form-group">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -348,6 +606,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                                     value={inputValue}
                                     onChange={handleInputChange}
                                     onFocus={openDropdown}
+                                    onBlur={() => setTimeout(closeDropdown, 150)}
                                     onKeyDown={handleKeyDown}
                                     autoComplete="off"
                                 />
@@ -392,10 +651,16 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                                 </button>
                             </div>
                         ))}
+
+                        {slots.length > 1 && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                                Multiple slots — a poll will be sent to participants to vote.
+                            </div>
+                        )}
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
                         <button type="submit" className="btn btn-primary" id="btn-create-meeting">
                             <Icon icon={Calendar02Icon} size={16} />
                             Create Meeting
@@ -411,7 +676,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.375rem;
             padding: 0.625rem; border: 0.0625rem solid var(--border);
             border-radius: var(--radius-sm); background: var(--bg-elevated);
-            color: var(--text-secondary); font-family: 'Inter', sans-serif;
+            color: var(--text-secondary);
             font-size: 0.8125rem; font-weight: 500; cursor: pointer;
             transition: all 0.2s ease;
           }
@@ -423,14 +688,13 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             color: var(--primary);
           }
 
-          /* ── Natural language date input ── */
           .nldate-wrapper {
             position: relative;
           }
           .nldate-input-row {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+
             padding: 0 0.75rem;
             background: var(--bg-elevated);
             border: 0.0625rem solid var(--border);
@@ -456,9 +720,11 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             background: none;
             outline: none;
             color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.875rem;
-            padding: 0.625rem 0;
+			font-size: var(--font-size-label);
+  			line-height: var(--lk-wholestep);
+  			letter-spacing: -0.011em;
+
+            padding: var(--lk-size-xs) var(--lk-size-sm);
           }
           .nldate-input::placeholder {
             color: var(--text-muted);
@@ -481,7 +747,6 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             color: var(--text-primary);
           }
 
-          /* ── Dropdown ── */
           .nldate-dropdown {
             position: fixed;
             background: var(--bg-secondary);
@@ -491,6 +756,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             z-index: 2000;
             overflow: hidden;
             animation: dropdownIn 0.15s ease;
+			padding: var(--lk-size-2xs);
           }
           @keyframes dropdownIn {
             from { opacity: 0; transform: translateY(-0.25rem); }
@@ -505,11 +771,11 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             border: none;
             background: transparent;
             color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
             font-size: 0.8125rem;
             cursor: pointer;
             transition: background 0.1s;
             text-align: left;
+			border-radius: var(--radius-xs);
           }
           .nldate-option.highlighted {
             background: var(--bg-hover);
@@ -522,7 +788,6 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             color: var(--text-muted);
           }
 
-          /* ── Slot list rows ── */
           .slot-row {
             display: flex;
             align-items: center;
@@ -552,7 +817,6 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             flex-shrink: 0;
           }
 
-          /* ── Label states ── */
           .slot-label {
             transition: color 0.4s ease, opacity 0.4s ease;
           }

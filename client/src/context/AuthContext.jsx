@@ -55,13 +55,21 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const updateUser = (updates) => {
+        setUser(prev => {
+            const updated = { ...prev, ...updates };
+            localStorage.setItem('mcms_userInfo', JSON.stringify(updated));
+            return updated;
+        });
+    };
+
     const logout = () => {
         localStorage.removeItem('mcms_userInfo');
         setUser(null);
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, register, logout, updateUser, loading }}>
             {!loading && children}
         </AuthContext.Provider>
     );
