@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import "./index.css";
 import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
@@ -12,6 +12,7 @@ import ProductivityDashboard from "./components/ProductivityDashboard";
 import PollVoting from "./components/PollVoting";
 import ProfileSettings from "./components/ProfileSettings";
 import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts";
+import useTranscriptionCapture from "./hooks/useTranscriptionCapture";
 import Icon from "./components/Icon";
 import { Calendar02Icon, Clock01Icon, UserIcon } from "@hugeicons/core-free-icons";
 
@@ -19,6 +20,7 @@ import { Calendar02Icon, Clock01Icon, UserIcon } from "@hugeicons/core-free-icon
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import { useAuth } from "./context/AuthContext";
+import { useSocket } from "./context/SocketContext";
 
 const API_BASE = "http://localhost:5001/api";
 
@@ -31,6 +33,7 @@ function formatDate(dateStr) {
 
 function DashboardApp() {
   const { user, logout } = useAuth();
+  const { socket } = useSocket();
 
   const [currentView, setCurrentView] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -50,11 +53,30 @@ function DashboardApp() {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
 
+  const [agendaPanelOpen, setAgendaPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const meetingLayoutRef = useRef(null);
+
+  const toggleAgendaPanel = useCallback(() => setAgendaPanelOpen(prev => !prev), []);
+  const toggleRightPanel = useCallback(() => setRightPanelOpen(prev => !prev), []);
+  const toggleFullscreen = useCallback(() => {
+    const target = meetingLayoutRef.current;
+    if (!target) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      target.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
   const shortcuts = useMemo(() => [
     { key: 'k', mod: true, handler: () => searchInputRef.current?.focus(), allowInInput: true },
     { key: 'b', mod: true, handler: () => setSidebarCollapsed(prev => !prev), allowInInput: true },
     { key: 'M', shift: true, handler: () => setShowCreateMeeting(true) },
     { key: 'd', handler: () => setTheme(prev => prev === 'dark' ? 'light' : 'dark') },
+    { key: 'f', handler: toggleFullscreen },
+    { key: '[', mod: true, handler: () => setAgendaPanelOpen(prev => !prev), allowInInput: true },
+    { key: ']', mod: true, handler: () => setRightPanelOpen(prev => !prev), allowInInput: true },
     { key: 'Escape', handler: () => {
       if (pollMeetingId) setPollMeetingId(null);
     }, allowInInput: true },
@@ -62,9 +84,10 @@ function DashboardApp() {
       key: String(i + 1),
       handler: () => setCurrentView(view),
     })),
-  ], [pollMeetingId]);
+  ], [pollMeetingId, toggleFullscreen]);
 
   useKeyboardShortcuts(shortcuts);
+  useTranscriptionCapture(socket, selectedMeeting?.id, user);
 
   // Helper for authenticated requests
   const fetchWithAuth = async (url, options = {}) => {
@@ -101,6 +124,34 @@ function DashboardApp() {
       fetchActionItems(selectedMeeting.id);
     }
   }, [selectedMeeting]);
+
+  useEffect(() => {
+    if (!socket || !selectedMeeting) return;
+
+    const meetingId = selectedMeeting.id;
+    socket.emit('join_meeting', { meetingId });
+
+    const handleTranscriptUpdate = (segment) => {
+      if (segment.meetingId === meetingId) {
+        setTranscripts(prev => [...prev, segment]);
+      }
+    };
+
+    const handleTranscriptReplaced = ({ meetingId: replacedId }) => {
+      if (replacedId === meetingId) {
+        fetchTranscript(meetingId);
+      }
+    };
+
+    socket.on('transcript_update', handleTranscriptUpdate);
+    socket.on('transcript_replaced', handleTranscriptReplaced);
+
+    return () => {
+      socket.emit('leave_meeting', { meetingId });
+      socket.off('transcript_update', handleTranscriptUpdate);
+      socket.off('transcript_replaced', handleTranscriptReplaced);
+    };
+  }, [socket, selectedMeeting]);
 
   const fetchMeetings = async () => {
     try {
@@ -180,30 +231,41 @@ function DashboardApp() {
 
       case "meeting":
         return (
-          <div className="meeting-layout">
-            <AgendaPanel
-              agendaItems={agendaItems}
-              onItemChange={setAgendaItems}
-            />
+          <div
+            ref={meetingLayoutRef}
+            className={`meeting-layout ${!agendaPanelOpen ? 'agenda-hidden' : ''} ${!rightPanelOpen ? 'right-hidden' : ''}`}
+          >
+            {agendaPanelOpen && (
+              <div className="meeting-side-panel meeting-side-panel-left open">
+                <AgendaPanel
+                  agendaItems={agendaItems}
+                  onItemChange={setAgendaItems}
+                  onClose={toggleAgendaPanel}
+                />
+              </div>
+            )}
             <VideoArea
+              meetingId={selectedMeeting?.id}
               meetingTitle={selectedMeeting?.title || "Select a Meeting"}
               participants={selectedMeeting?.participants || []}
               jitsiRoomName={selectedMeeting?.jitsiRoomName}
               modality={selectedMeeting?.modality}
               currentUser={user}
+              fullscreenRef={meetingLayoutRef}
+              agendaPanelOpen={agendaPanelOpen}
+              rightPanelOpen={rightPanelOpen}
+              onToggleAgendaPanel={toggleAgendaPanel}
+              onToggleRightPanel={toggleRightPanel}
             />
-            <div
-              className="panel"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                background: "var(--bg-card)",
-              }}
-            >
-              <TranscriptFeed transcripts={transcripts} />
-              <ActionItems items={actionItems} />
-              <LiveOutcome />
-            </div>
+            {rightPanelOpen && (
+              <div className="meeting-side-panel meeting-side-panel-right open">
+                <div className="right-panel-content">
+                  <TranscriptFeed transcripts={transcripts} onClosePanel={toggleRightPanel} />
+                  <ActionItems items={actionItems} />
+                  <LiveOutcome />
+                </div>
+              </div>
+            )}
           </div>
         );
 

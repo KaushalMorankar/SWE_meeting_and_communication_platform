@@ -45,9 +45,12 @@ export default function ShortcutTooltip({ keys, position = 'bottom', children })
     } else if (position === 'top') {
       top = ar.top - tr.height - gap;
       left = ar.left + ar.width / 2 - tr.width / 2;
-    } else {
+    } else if (position === 'right') {
       top = ar.top + ar.height / 2 - tr.height / 2;
       left = ar.right + gap;
+    } else {
+      top = ar.top + ar.height / 2 - tr.height / 2;
+      left = ar.left - tr.width - gap;
     }
 
     const vw = window.innerWidth;

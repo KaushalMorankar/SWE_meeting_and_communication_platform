@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Icon from './Icon';
 import {
   Mic01Icon,
@@ -12,13 +12,36 @@ import {
   RecordIcon,
 } from '@hugeicons/core-free-icons';
 import QROverlay from './QROverlay';
+import { useSocket } from '../context/SocketContext';
 
-export default function HostControls({ meetingTitle }) {
+export default function HostControls({ meetingId, meetingTitle }) {
+    const { socket } = useSocket();
     const [recording, setRecording] = useState(false);
     const [muted, setMuted] = useState(false);
     const [videoOn, setVideoOn] = useState(true);
     const [sharing, setSharing] = useState(false);
     const [showQR, setShowQR] = useState(false);
+
+    useEffect(() => {
+        if (!socket) return;
+        const onStarted = ({ meetingId: mid }) => { if (mid === meetingId) setRecording(true); };
+        const onStopped = ({ meetingId: mid }) => { if (mid === meetingId) setRecording(false); };
+        socket.on('transcription_started', onStarted);
+        socket.on('transcription_stopped', onStopped);
+        return () => {
+            socket.off('transcription_started', onStarted);
+            socket.off('transcription_stopped', onStopped);
+        };
+    }, [socket, meetingId]);
+
+    const toggleRecording = useCallback(() => {
+        if (!socket || !meetingId) return;
+        if (recording) {
+            socket.emit('stop_transcription', { meetingId });
+        } else {
+            socket.emit('start_transcription', { meetingId });
+        }
+    }, [socket, meetingId, recording]);
 
     return (
         <>
@@ -55,7 +78,7 @@ export default function HostControls({ meetingTitle }) {
 
                     <button
                         className={`control-btn ${recording ? 'recording' : ''}`}
-                        onClick={() => setRecording(!recording)}
+                        onClick={toggleRecording}
                         id="btn-record"
                     >
                         <Icon icon={RecordIcon} size={16} />

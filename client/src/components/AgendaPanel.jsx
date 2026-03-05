@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import Icon from './Icon';
+import ShortcutTooltip from './ShortcutTooltip';
 import {
   PlayIcon,
   PauseIcon,
   CheckmarkCircle01Icon,
   Clock01Icon,
   Add01Icon,
-  ViewAgendaIcon
+  ViewAgendaIcon,
+  SidebarLeftIcon,
 } from '@hugeicons/core-free-icons';
 
-export default function AgendaPanel({ agendaItems, onItemChange }) {
+export default function AgendaPanel({ agendaItems, onItemChange, onClose }) {
     const [items, setItems] = useState(agendaItems);
     const [activeId, setActiveId] = useState(null);
     const [countdown, setCountdown] = useState(0);
@@ -82,9 +84,22 @@ export default function AgendaPanel({ agendaItems, onItemChange }) {
 					<Icon icon={ViewAgendaIcon} size={16} />
                 <span className="section-title">Agenda</span>
 				</div>
-                <button className="btn-icon" id="btn-add-agenda">
-                    <Icon icon={Add01Icon} size={16} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--lk-size-2xs)' }}>
+                    <button className="btn-icon" id="btn-add-agenda">
+                        <Icon icon={Add01Icon} size={16} />
+                    </button>
+                    {onClose && (
+                        <ShortcutTooltip keys={['mod', '[']} position="bottom">
+                            <button
+                                className="btn-icon"
+                                onClick={onClose}
+                                id="btn-close-agenda"
+                            >
+                                <Icon icon={SidebarLeftIcon} size={16} />
+                            </button>
+                        </ShortcutTooltip>
+                    )}
+                </div>
             </div>
 
             {activeId && (

@@ -1,19 +1,52 @@
+import { useCallback, useState, useEffect } from "react";
 import HostControls from "./HostControls";
 import Icon from "./Icon";
-import { UserGroupIcon, FullScreenIcon } from "@hugeicons/core-free-icons";
+import { UserGroupIcon, FullScreenIcon, MinimizeScreenIcon, SidebarLeftIcon, SidebarRightIcon } from "@hugeicons/core-free-icons";
 import { JitsiMeeting } from "@jitsi/react-sdk";
+import ShortcutTooltip from "./ShortcutTooltip";
 
 export default function VideoArea({
+  meetingId,
   meetingTitle,
   participants,
   jitsiRoomName,
   modality,
   currentUser,
+  fullscreenRef,
+  agendaPanelOpen,
+  rightPanelOpen,
+  onToggleAgendaPanel,
+  onToggleRightPanel,
 }) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const target = fullscreenRef?.current;
+    if (!target) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      target.requestFullscreen().catch(() => {});
+    }
+  }, [fullscreenRef]);
+
   return (
     <div className="video-area">
       <div className="video-header">
-        <div>
+        {!agendaPanelOpen && (
+          <ShortcutTooltip keys={['mod', '[']} position="right">
+            <button className="video-panel-toggle" onClick={onToggleAgendaPanel}>
+              <Icon icon={SidebarLeftIcon} size={16} />
+            </button>
+          </ShortcutTooltip>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h2 className="video-meeting-title">
             {meetingTitle || "No Active Meeting"}
           </h2>
@@ -22,13 +55,23 @@ export default function VideoArea({
             <span>{participants?.length || 0} participants</span>
           </div>
         </div>
-        <button
-          className="btn-icon tooltip"
-          data-tooltip="Fullscreen"
-          id="btn-fullscreen"
-        >
-          <Icon icon={FullScreenIcon} size={16} />
-        </button>
+        <ShortcutTooltip keys={['F']}>
+          <button
+            className="btn-icon"
+            id="btn-fullscreen"
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+          >
+            <Icon icon={isFullscreen ? MinimizeScreenIcon : FullScreenIcon} size={16} />
+          </button>
+        </ShortcutTooltip>
+        {!rightPanelOpen && (
+          <ShortcutTooltip keys={['mod', ']']} position="left">
+            <button className="video-panel-toggle" onClick={onToggleRightPanel}>
+              <Icon icon={SidebarRightIcon} size={16} />
+            </button>
+          </ShortcutTooltip>
+        )}
       </div>
 
       <div className="video-container">
@@ -42,9 +85,99 @@ export default function VideoArea({
                 disableModeratorIndicator: true,
                 startScreenSharing: false,
                 enableEmailInStats: false,
+                disableThirdPartyRequests: true,
+                prejoinConfig: { enabled: false },
+                disableLocalVideoFlip: true,
+                toolbarButtons: [
+                  "camera",
+                  "chat",
+                  "desktop",
+                  "fullscreen",
+                  "hangup",
+                  "microphone",
+                  "participants-pane",
+                  "raisehand",
+                  "select-background",
+                  "settings",
+                  "tileview",
+                  "toggle-camera",
+                  "videoquality",
+                ],
+                toolbarConfig: {
+                  alwaysVisible: true,
+                },
+                customTheme: {
+                  palette: {
+                    uiBackground: "#100F0F",
+                    ui01: "#1C1B1A",
+                    ui02: "#282726",
+                    ui03: "#343331",
+                    ui04: "#403E3C",
+                    ui05: "#575653",
+                    action01: "#24847B",
+                    action01Hover: "#2F968D",
+                    action01Active: "#1C6C66",
+                    disabled01: "#122F2C",
+                    action02: "#282726",
+                    action02Hover: "#343331",
+                    action02Active: "#1C1B1A",
+                    action03: "transparent",
+                    action03Hover: "#343331",
+                    action03Active: "#1C1B1A",
+                    actionDanger: "#D14D41",
+                    actionDangerHover: "#E8705F",
+                    actionDangerActive: "#AF3029",
+                    text01: "#CECDC3",
+                    text02: "#9F9D96",
+                    text03: "#878580",
+                    text04: "#B7B5AC",
+                    textError: "#E8705F",
+                    icon01: "#CECDC3",
+                    icon02: "#9F9D96",
+                    icon03: "#878580",
+                    iconError: "#E8705F",
+                    field01: "#1C1B1A",
+                    link01: "#3AA99F",
+                    link01Hover: "#5ABDAC",
+                    link01Active: "#24847B",
+                    success01: "#879A39",
+                    success02: "#A0AF54",
+                    warning01: "#D0A215",
+                    warning02: "#DFB431",
+                    support01: "#DA702C",
+                    support02: "#D14D41",
+                    support03: "#CE5D97",
+                    support04: "#8B7EC8",
+                    support05: "#5E409D",
+                    support06: "#4385BE",
+                    support07: "#3AA99F",
+                    support08: "#879A39",
+                    support09: "#2F968D",
+                    bottomSheet: "#1C1B1A",
+                    surface02: "#282726",
+                  },
+                  typography: {
+                    font: {
+                      weightRegular: "400",
+                      weightSemiBold: "600",
+                    },
+                  },
+                  shape: {
+                    borderRadius: 10,
+                    boxShadow:
+                      "inset 0px -1px 0px rgba(206, 205, 195, 0.1)",
+                  },
+                },
               }}
               interfaceConfigOverwrite={{
                 DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+                SHOW_JITSI_WATERMARK: false,
+                SHOW_WATERMARK_FOR_GUESTS: false,
+                SHOW_BRAND_WATERMARK: false,
+                SHOW_POWERED_BY: false,
+                DEFAULT_BACKGROUND: "#100F0F",
+                MOBILE_APP_PROMO: false,
+                HIDE_INVITE_MORE_HEADER: true,
               }}
               userInfo={{
                 displayName: currentUser?.name || "User",
@@ -57,6 +190,8 @@ export default function VideoArea({
               getIFrameRef={(iframeRef) => {
                 iframeRef.style.height = "100%";
                 iframeRef.style.width = "100%";
+                iframeRef.style.borderRadius = "0.618rem";
+                iframeRef.style.border = "1px solid #403E3C";
               }}
             />
           ) : modality === "Offline" ? (
@@ -104,7 +239,7 @@ export default function VideoArea({
         </div>
       </div>
 
-      <HostControls meetingTitle={meetingTitle} />
+      <HostControls meetingId={meetingId} meetingTitle={meetingTitle} />
 
       <style>{`
         .video-area {
@@ -112,11 +247,34 @@ export default function VideoArea({
           flex-direction: column;
           height: 100%;
           background: var(--bg-primary);
+		  border: 0.0625rem solid var(--border);
+		  border-radius: var(--radius-md);
+		  overflow: hidden;
+        }
+        .video-panel-toggle {
+          flex-shrink: 0;
+          width: 2rem;
+          height: 2rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-card);
+          border: 0.0625rem solid var(--border);
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: background 0.2s, color 0.2s, border-color 0.2s;
+          padding: 0;
+        }
+        .video-panel-toggle:hover {
+          background: var(--bg-hover);
+          color: var(--primary);
+          border-color: var(--border-hover);
         }
         .video-header {
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          gap: 0.75rem;
           padding: 0.75rem 1.25rem;
           border-bottom: 0.0625rem solid var(--border);
         }
