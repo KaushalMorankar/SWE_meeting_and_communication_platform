@@ -16,7 +16,7 @@ function SidebarToggleIcon({ collapsed }) {
     return (
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="svg-icon sidebar-toggle-button-icon">
             <rect x="1" y="2" width="22" height="20" rx="4" />
-            <rect x="4" y="5" width="2" height="14" rx="2" fill="currentColor" className={collapsed ? 'sidebar-toggle-icon-close' : 'sidebar-toggle-icon-open'} />
+            <rect x={collapsed ? "4.9" : "4"} y={collapsed ? "6" : "5"} width="2" height={collapsed ? "12" : "14"} rx="1" fill="currentColor" className={collapsed ? 'sidebar-toggle-icon-close' : 'sidebar-toggle-icon-open'} />
         </svg>
     );
 }
@@ -77,12 +77,12 @@ export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark',
 
                     {showUserMenu && (
                         <div className="glass-card" style={{
-                            position: 'absolute', right: 0, top: '48px', width: '200px',
-                            padding: '8px', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '4px'
+                            position: 'absolute', right: 0, top: '3rem', width: '12.5rem',
+                            padding: '0.5rem', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '0.25rem'
                         }}>
-                            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-glass)', marginBottom: '4px' }}>
-                                <div style={{ fontSize: '13px', fontWeight: 600 }}>{userName}</div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Host Account</div>
+                            <div style={{ padding: '0.5rem 0.75rem', borderBottom: '0.0625rem solid var(--border)', marginBottom: '0.25rem' }}>
+                                <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{userName}</div>
+                                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Host Account</div>
                             </div>
                             <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'flex-start', border: 'none' }}>Profile Settings</button>
                             {onLogout && (
@@ -92,7 +92,7 @@ export default function TopBar({ streak, userName, onNewMeeting, theme = 'dark',
                                     onClick={onLogout}
                                 >
                                     <Icon icon={Logout01Icon} size={16} />
-                                    <span style={{ marginLeft: '8px' }}>Logout</span>
+                                    <span style={{ marginLeft: '0.5rem' }}>Logout</span>
                                 </button>
                             )}
                         </div>

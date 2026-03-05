@@ -15,7 +15,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import { useAuth } from "./context/AuthContext";
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = "http://localhost:5001/api";
 
 function DashboardApp() {
   const { user, logout } = useAuth();
@@ -178,12 +178,12 @@ function DashboardApp() {
 
       case "schedule":
         return (
-          <div style={{ flex: 1, overflow: "auto", padding: "24px" }}>
+          <div style={{ flex: 1, overflow: "auto", padding: "1.5rem" }}>
             <h2
               style={{
-                fontSize: "22px",
+                fontSize: "1.375rem",
                 fontWeight: 700,
-                marginBottom: "16px",
+                marginBottom: "1rem",
               }}
             >
               Scheduled Meetings
@@ -199,7 +199,7 @@ function DashboardApp() {
                   }}
                   style={
                     selectedMeeting?.id === meeting.id
-                      ? { borderColor: "rgba(79, 142, 247, 0.3)" }
+                      ? { borderColor: "var(--primary-border)" }
                       : {}
                   }
                 >
@@ -227,17 +227,17 @@ function DashboardApp() {
 
       case "archive":
         return (
-          <div style={{ flex: 1, overflow: "auto", padding: "24px" }}>
+          <div style={{ flex: 1, overflow: "auto", padding: "1.5rem" }}>
             <h2
-              style={{ fontSize: "22px", fontWeight: 700, marginBottom: "8px" }}
+              style={{ fontSize: "1.375rem", fontWeight: 700, marginBottom: "0.5rem" }}
             >
               Meeting Archives
             </h2>
             <p
               style={{
-                fontSize: "13px",
+                fontSize: "0.8125rem",
                 color: "var(--text-muted)",
-                marginBottom: "20px",
+                marginBottom: "1.25rem",
               }}
             >
               Search and browse past meeting transcripts, summaries, and action
@@ -328,7 +328,7 @@ export default function App() {
           background: "var(--bg-primary)",
         }}
       >
-        <div style={{ color: "var(--accent-blue)", fontSize: "24px" }}>
+        <div style={{ color: "var(--primary)", fontSize: "1.5rem" }}>
           ⌘ MCMS Loading...
         </div>
       </div>

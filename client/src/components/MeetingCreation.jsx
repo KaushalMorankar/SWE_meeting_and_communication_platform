@@ -287,7 +287,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                         />
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: '8px' }}>
+                    <div className="form-group" style={{ marginBottom: '0.5rem' }}>
                         <label className="form-label">Meeting Modality</label>
                         <div className="modality-options">
                             {['Online', 'Offline', 'Hybrid'].map(m => (
@@ -312,7 +312,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                             padding: '0', background: 'none',
                             borderRadius: 'var(--radius-sm)', border: 'none'
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--accent-blue)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
                                 A Jitsi Meet URL will be auto-generated
                             </div>
                         </div>
@@ -387,14 +387,14 @@ export default function MeetingCreation({ onClose, onSubmit }) {
                                     <Icon icon={Calendar02Icon} size={14} className="slot-row-icon" />
                                     <span>{slot.display}</span>
                                 </div>
-                                <button type="button" className="btn-icon" onClick={() => removeSlot(slot.id)} style={{ width: '20px', height: '20px' }}>
+                                <button type="button" className="btn-icon" onClick={() => removeSlot(slot.id)} style={{ width: '1.25rem', height: '1.25rem' }}>
                                     <Icon icon={Delete02Icon} size={14} />
                                 </button>
                             </div>
                         ))}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
                         <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
                         <button type="submit" className="btn btn-primary" id="btn-create-meeting">
                             <Icon icon={Calendar02Icon} size={16} />
@@ -405,22 +405,22 @@ export default function MeetingCreation({ onClose, onSubmit }) {
 
                 <style>{`
           .modality-options {
-            display: flex; gap: 8px;
+            display: flex; gap: 0.5rem;
           }
           .modality-btn {
-            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 10px; border: 1px solid var(--border-glass);
-            border-radius: var(--radius-sm); background: var(--bg-glass);
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.375rem;
+            padding: 0.625rem; border: 0.0625rem solid var(--border);
+            border-radius: var(--radius-sm); background: var(--bg-elevated);
             color: var(--text-secondary); font-family: 'Inter', sans-serif;
-            font-size: 13px; font-weight: 500; cursor: pointer;
+            font-size: 0.8125rem; font-weight: 500; cursor: pointer;
             transition: all 0.2s ease;
           }
           .modality-btn:hover {
-            background: var(--bg-glass-hover); border-color: var(--border-glass-active);
+            background: var(--bg-hover); border-color: var(--border-hover);
           }
           .modality-btn.active {
-            background: rgba(79, 142, 247, 0.12); border-color: rgba(79, 142, 247, 0.3);
-            color: var(--accent-blue);
+            background: var(--primary-muted); border-color: var(--primary-border);
+            color: var(--primary);
           }
 
           /* ── Natural language date input ── */
@@ -430,20 +430,20 @@ export default function MeetingCreation({ onClose, onSubmit }) {
           .nldate-input-row {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 0 12px;
-            background: var(--bg-glass);
-            border: 1px solid var(--border-glass);
+            gap: 0.5rem;
+            padding: 0 0.75rem;
+            background: var(--bg-elevated);
+            border: 0.0625rem solid var(--border);
             border-radius: var(--radius-sm);
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
           }
           .nldate-input-row:focus-within {
-            border-color: var(--accent-blue);
-            box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.1);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.1875rem var(--primary-muted);
           }
           .nldate-input-row.nldate-error {
             border-color: var(--accent-rose);
-            box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15);
+            box-shadow: 0 0 0 0.1875rem var(--accent-rose-muted);
             animation: shake 0.4s ease;
           }
           .nldate-icon {
@@ -457,8 +457,8 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             outline: none;
             color: var(--text-primary);
             font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            padding: 10px 0;
+            font-size: 0.875rem;
+            padding: 0.625rem 0;
           }
           .nldate-input::placeholder {
             color: var(--text-muted);
@@ -467,17 +467,17 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 18px; height: 18px;
+            width: 1.125rem; height: 1.125rem;
             border-radius: 50%;
             border: none;
-            background: var(--bg-glass-hover);
+            background: var(--bg-hover);
             color: var(--text-muted);
             cursor: pointer;
             flex-shrink: 0;
             transition: all 0.15s;
           }
           .nldate-clear:hover {
-            background: var(--border-glass-active);
+            background: var(--border-hover);
             color: var(--text-primary);
           }
 
@@ -485,7 +485,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
           .nldate-dropdown {
             position: fixed;
             background: var(--bg-secondary);
-            border: 1px solid var(--border-glass);
+            border: 0.0625rem solid var(--border);
             border-radius: var(--radius-sm);
             box-shadow: var(--shadow-lg);
             z-index: 2000;
@@ -493,7 +493,7 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             animation: dropdownIn 0.15s ease;
           }
           @keyframes dropdownIn {
-            from { opacity: 0; transform: translateY(-4px); }
+            from { opacity: 0; transform: translateY(-0.25rem); }
             to   { opacity: 1; transform: translateY(0); }
           }
           .nldate-option {
@@ -501,24 +501,24 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             align-items: center;
             justify-content: space-between;
             width: 100%;
-            padding: 10px 14px;
+            padding: 0.625rem 0.875rem;
             border: none;
             background: transparent;
             color: var(--text-primary);
             font-family: 'Inter', sans-serif;
-            font-size: 13px;
+            font-size: 0.8125rem;
             cursor: pointer;
             transition: background 0.1s;
             text-align: left;
           }
           .nldate-option.highlighted {
-            background: var(--bg-glass-hover);
+            background: var(--bg-hover);
           }
           .nldate-option-label {
             font-weight: 500;
           }
           .nldate-option-detail {
-            font-size: 12px;
+            font-size: 0.75rem;
             color: var(--text-muted);
           }
 
@@ -527,28 +527,28 @@ export default function MeetingCreation({ onClose, onSubmit }) {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 8px;
-            margin-top: 8px;
-            padding: 4px 8px;
-            background: var(--bg-glass);
-            border: 1px solid var(--border-glass);
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-elevated);
+            border: 0.0625rem solid var(--border);
             border-radius: var(--radius-sm);
             animation: slotIn 0.2s ease;
           }
           @keyframes slotIn {
-            from { opacity: 0; transform: translateY(-4px); }
+            from { opacity: 0; transform: translateY(-0.25rem); }
             to   { opacity: 1; transform: translateY(0); }
           }
           .slot-row-content {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 13px;
+            gap: 0.5rem;
+            font-size: 0.8125rem;
             font-weight: 500;
             color: var(--text-primary);
           }
           .slot-row-icon {
-            color: var(--accent-blue);
+            color: var(--primary);
             flex-shrink: 0;
           }
 
@@ -569,8 +569,8 @@ export default function MeetingCreation({ onClose, onSubmit }) {
           }
           @keyframes shake {
             0%, 100% { transform: translateX(0); }
-            25%      { transform: translateX(-4px); }
-            75%      { transform: translateX(4px); }
+            25%      { transform: translateX(-0.25rem); }
+            75%      { transform: translateX(0.25rem); }
           }
         `}</style>
             </div>

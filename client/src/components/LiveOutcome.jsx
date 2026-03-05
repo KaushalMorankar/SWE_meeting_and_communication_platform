@@ -4,9 +4,9 @@ import { Target01Icon, Alert01Icon, ChartIncreaseIcon } from '@hugeicons/core-fr
 export default function LiveOutcome() {
     return (
         <div className="live-outcome">
-            <div className="section-header" style={{ borderTop: '1px solid var(--border-glass)' }}>
+            <div className="section-header" style={{ borderTop: '0.0625rem solid var(--border)' }}>
                 <span className="section-title">🔮 Live Outcome Preview</span>
-                <span className="chip chip-violet" style={{ fontSize: '10px' }}>DOPPELGANGER</span>
+                <span className="chip chip-violet" style={{ fontSize: '0.625rem' }}>DOPPELGANGER</span>
             </div>
 
             <div className="outcome-content">
@@ -43,7 +43,7 @@ export default function LiveOutcome() {
                         <span>2 of 5 agenda items addressed</span>
                     </div>
                     <div className="outcome-item">
-                        <Icon icon={ChartIncreaseIcon} size={14} style={{ color: 'var(--accent-blue)' }} />
+                        <Icon icon={ChartIncreaseIcon} size={14} style={{ color: 'var(--primary)' }} />
                         <span>3 action items extracted so far</span>
                     </div>
                     <div className="outcome-item">
@@ -55,27 +55,27 @@ export default function LiveOutcome() {
 
             <style>{`
         .live-outcome {
-          border-top: 1px solid var(--border-glass);
+          border-top: 0.0625rem solid var(--border);
         }
-        .outcome-content { padding: 12px 16px; }
+        .outcome-content { padding: 0.75rem 1rem; }
         .outcome-score {
-          display: flex; align-items: center; gap: 12px;
-          margin-bottom: 12px;
+          display: flex; align-items: center; gap: 0.75rem;
+          margin-bottom: 0.75rem;
         }
         .score-circle {
-          position: relative; width: 64px; height: 64px; flex-shrink: 0;
+          position: relative; width: 4rem; height: 4rem; flex-shrink: 0;
         }
         .score-value {
           position: absolute; inset: 0;
           display: flex; align-items: center; justify-content: center;
-          font-size: 16px; font-weight: 700;
+          font-size: 1rem; font-weight: 700;
         }
-        .score-label { font-size: 13px; font-weight: 600; }
-        .score-desc { font-size: 11px; color: var(--text-muted); }
-        .outcome-items { display: flex; flex-direction: column; gap: 6px; }
+        .score-label { font-size: 0.8125rem; font-weight: 600; }
+        .score-desc { font-size: 0.6875rem; color: var(--text-muted); }
+        .outcome-items { display: flex; flex-direction: column; gap: 0.375rem; }
         .outcome-item {
-          display: flex; align-items: center; gap: 8px;
-          font-size: 12px; color: var(--text-secondary);
+          display: flex; align-items: center; gap: 0.5rem;
+          font-size: 0.75rem; color: var(--text-secondary);
         }
       `}</style>
         </div>

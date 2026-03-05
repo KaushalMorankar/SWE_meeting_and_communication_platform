@@ -22,16 +22,16 @@ export default function ProductivityDashboard({ stats, userName }) {
         <div className="productivity-dashboard">
             <div className="dashboard-header">
                 <div>
-                    <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>
+                    <h2 style={{ fontSize: '1.375rem', fontWeight: 700, marginBottom: '0.25rem' }}>
                         Productivity Dashboard
                     </h2>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                         Welcome back, <strong>{userName || stats.user}</strong>. Here's your meeting intelligence overview.
                     </p>
                 </div>
             </div>
 
-            <div className="tabs" style={{ margin: '0 20px' }}>
+            <div className="tabs" style={{ margin: '0 1.25rem' }}>
                 {['overview', 'attendance', 'engagement'].map(tab => (
                     <button
                         key={tab}
@@ -47,15 +47,15 @@ export default function ProductivityDashboard({ stats, userName }) {
             {activeTab === 'overview' && (
                 <div className="dashboard-grid">
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <Icon icon={Calendar02Icon} size={18} style={{ color: 'var(--accent-blue)' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                            <Icon icon={Calendar02Icon} size={18} style={{ color: 'var(--primary)' }} />
                             <span className="stat-label">Meetings Attended</span>
                         </div>
                         <div className="stat-value">{stats.totalMeetings}</div>
                     </div>
 
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                             <Icon icon={Clock01Icon} size={18} style={{ color: 'var(--accent-violet)' }} />
                             <span className="stat-label">Total Hours</span>
                         </div>
@@ -63,7 +63,7 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                             <Icon icon={ChartIncreaseIcon} size={18} style={{ color: 'var(--accent-emerald)' }} />
                             <span className="stat-label">Punctuality Rate</span>
                         </div>
@@ -71,7 +71,7 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                             <Icon icon={CheckmarkSquare01Icon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Tasks Completed</span>
                         </div>
@@ -79,7 +79,7 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                             <Icon icon={BarChartIcon} size={18} style={{ color: 'var(--accent-cyan)' }} />
                             <span className="stat-label">Weekly Meeting Load Heatmap</span>
                         </div>
@@ -91,7 +91,7 @@ export default function ProductivityDashboard({ stats, userName }) {
                                         style={{ height: `${(day.hours / maxHours) * 100}%` }}
                                     ></div>
                                     <span className="heatmap-label">{day.day}</span>
-                                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                    <span style={{ fontSize: '0.6875rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
                                         {day.hours}h
                                     </span>
                                 </div>
@@ -100,7 +100,7 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                             <Icon icon={Award01Icon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Badges & Achievements</span>
                         </div>
@@ -118,42 +118,42 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                             <Icon icon={FireIcon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Meeting Streak</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <div className="stat-value">{stats.streak}</div>
-                            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>consecutive on-time</span>
+                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>consecutive on-time</span>
                         </div>
                     </div>
 
                     <div className="stat-card glass-card">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                             <Icon icon={UserGroupIcon} size={18} style={{ color: 'var(--accent-violet)' }} />
                             <span className="stat-label">Sentiment Profile</span>
                         </div>
                         <div className="sentiment-bars">
                             <div className="sentiment-bar-row">
-                                <span style={{ color: 'var(--accent-emerald)', fontSize: '12px', width: '70px' }}>Positive</span>
+                                <span style={{ color: 'var(--accent-emerald)', fontSize: '0.75rem', width: '4.375rem' }}>Positive</span>
                                 <div className="sentiment-track">
                                     <div className="sentiment-fill" style={{ width: `${stats.sentimentProfile.positive}%`, background: 'var(--accent-emerald)' }}></div>
                                 </div>
-                                <span style={{ fontSize: '12px', fontWeight: 600 }}>{stats.sentimentProfile.positive}%</span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{stats.sentimentProfile.positive}%</span>
                             </div>
                             <div className="sentiment-bar-row">
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '12px', width: '70px' }}>Neutral</span>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', width: '4.375rem' }}>Neutral</span>
                                 <div className="sentiment-track">
                                     <div className="sentiment-fill" style={{ width: `${stats.sentimentProfile.neutral}%`, background: 'var(--text-muted)' }}></div>
                                 </div>
-                                <span style={{ fontSize: '12px', fontWeight: 600 }}>{stats.sentimentProfile.neutral}%</span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{stats.sentimentProfile.neutral}%</span>
                             </div>
                             <div className="sentiment-bar-row">
-                                <span style={{ color: 'var(--accent-rose)', fontSize: '12px', width: '70px' }}>Negative</span>
+                                <span style={{ color: 'var(--accent-rose)', fontSize: '0.75rem', width: '4.375rem' }}>Negative</span>
                                 <div className="sentiment-track">
                                     <div className="sentiment-fill" style={{ width: `${stats.sentimentProfile.negative}%`, background: 'var(--accent-rose)' }}></div>
                                 </div>
-                                <span style={{ fontSize: '12px', fontWeight: 600 }}>{stats.sentimentProfile.negative}%</span>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{stats.sentimentProfile.negative}%</span>
                             </div>
                         </div>
                     </div>
@@ -163,8 +163,8 @@ export default function ProductivityDashboard({ stats, userName }) {
             {activeTab === 'attendance' && (
                 <div className="dashboard-grid">
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                            <Icon icon={Calendar02Icon} size={18} style={{ color: 'var(--accent-blue)' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                            <Icon icon={Calendar02Icon} size={18} style={{ color: 'var(--primary)' }} />
                             <span className="stat-label">Monthly Attendance</span>
                         </div>
                         <div className="attendance-chart">
@@ -184,23 +184,23 @@ export default function ProductivityDashboard({ stats, userName }) {
                     </div>
 
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                             <Icon icon={Clock01Icon} size={18} style={{ color: 'var(--accent-violet)' }} />
                             <span className="stat-label">Speaking Time vs Average Meeting Duration</span>
                         </div>
-                        <div style={{ display: 'flex', gap: '24px', alignItems: 'center', padding: '12px 0' }}>
+                        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', padding: '0.75rem 0' }}>
                             <div>
-                                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--accent-blue)' }}>
+                                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--primary)' }}>
                                     {stats.speakingTime} min
                                 </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Avg Speaking Time</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Avg Speaking Time</div>
                             </div>
-                            <div style={{ width: '1px', height: '40px', background: 'var(--border-glass)' }}></div>
+                            <div style={{ width: '0.0625rem', height: '2.5rem', background: 'var(--border)' }}></div>
                             <div>
-                                <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--accent-violet)' }}>
+                                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--accent-violet)' }}>
                                     {stats.avgMeetingDuration} min
                                 </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Avg Meeting Duration</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Avg Meeting Duration</div>
                             </div>
                         </div>
                     </div>
@@ -210,7 +210,7 @@ export default function ProductivityDashboard({ stats, userName }) {
             {activeTab === 'engagement' && (
                 <div className="dashboard-grid">
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                             <Icon icon={Award01Icon} size={18} style={{ color: 'var(--accent-amber)' }} />
                             <span className="stat-label">Contribution & Engagement</span>
                         </div>
@@ -219,25 +219,25 @@ export default function ProductivityDashboard({ stats, userName }) {
                                 <div className="engagement-circle" style={{ '--pct': `${(stats.tasksCompleted / stats.tasksTotal) * 100}%` }}>
                                     <span>{Math.round((stats.tasksCompleted / stats.tasksTotal) * 100)}%</span>
                                 </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Task Completion</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Task Completion</div>
                             </div>
                             <div className="engagement-metric">
                                 <div className="engagement-circle" style={{ '--pct': `${stats.punctualityRate}%` }}>
                                     <span>{stats.punctualityRate}%</span>
                                 </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Punctuality</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Punctuality</div>
                             </div>
                             <div className="engagement-metric">
                                 <div className="engagement-circle" style={{ '--pct': `${stats.sentimentProfile.positive}%` }}>
                                     <span>{stats.sentimentProfile.positive}%</span>
                                 </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Positive Tone</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Positive Tone</div>
                             </div>
                         </div>
                     </div>
 
                     <div className="stat-card glass-card" style={{ gridColumn: 'span 2' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
                             <Icon icon={ChartIncreaseIcon} size={18} style={{ color: 'var(--accent-emerald)' }} />
                             <span className="stat-label">AI-Generated Recommendations</span>
                         </div>
@@ -263,79 +263,79 @@ export default function ProductivityDashboard({ stats, userName }) {
         .productivity-dashboard {
           height: 100%;
           overflow-y: auto;
-          padding-bottom: 24px;
+          padding-bottom: 1.5rem;
         }
         .dashboard-header {
-          padding: 24px 20px 16px;
+          padding: 1.5rem 1.25rem 1rem;
         }
         .badges-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 10px;
+          gap: 0.625rem;
         }
         .badge-item {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 10px 14px;
-          background: var(--bg-glass);
-          border: 1px solid var(--border-glass);
+          gap: 0.75rem;
+          padding: 0.625rem 0.875rem;
+          background: var(--bg-elevated);
+          border: 0.0625rem solid var(--border);
           border-radius: var(--radius-sm);
           transition: all 0.2s;
         }
         .badge-item:hover {
-          background: var(--bg-glass-hover);
-          border-color: var(--border-glass-active);
+          background: var(--bg-hover);
+          border-color: var(--border-hover);
         }
-        .badge-icon { font-size: 24px; }
-        .badge-name { font-size: 13px; font-weight: 600; }
-        .badge-desc { font-size: 11px; color: var(--text-muted); }
-        .sentiment-bars { display: flex; flex-direction: column; gap: 10px; }
-        .sentiment-bar-row { display: flex; align-items: center; gap: 10px; }
+        .badge-icon { font-size: 1.5rem; }
+        .badge-name { font-size: 0.8125rem; font-weight: 600; }
+        .badge-desc { font-size: 0.6875rem; color: var(--text-muted); }
+        .sentiment-bars { display: flex; flex-direction: column; gap: 0.625rem; }
+        .sentiment-bar-row { display: flex; align-items: center; gap: 0.625rem; }
         .sentiment-track {
-          flex: 1; height: 8px; background: rgba(255,255,255,0.06);
-          border-radius: 4px; overflow: hidden;
+          flex: 1; height: 0.5rem; background: rgba(255,255,255,0.06);
+          border-radius: 0.25rem; overflow: hidden;
         }
         .sentiment-fill {
-          height: 100%; border-radius: 4px;
+          height: 100%; border-radius: 0.25rem;
           transition: width 0.8s ease;
         }
-        .attendance-chart { display: flex; flex-direction: column; gap: 12px; }
-        .attendance-week { display: flex; align-items: center; gap: 12px; }
-        .attendance-label { font-size: 12px; color: var(--text-muted); width: 30px; }
+        .attendance-chart { display: flex; flex-direction: column; gap: 0.75rem; }
+        .attendance-week { display: flex; align-items: center; gap: 0.75rem; }
+        .attendance-label { font-size: 0.75rem; color: var(--text-muted); width: 1.875rem; }
         .attendance-bar-track {
-          flex: 1; height: 16px; background: rgba(255,255,255,0.04);
-          border-radius: 8px; overflow: hidden;
+          flex: 1; height: 1rem; background: rgba(255,255,255,0.04);
+          border-radius: 0.5rem; overflow: hidden;
         }
         .attendance-bar-fill {
-          height: 100%; background: var(--gradient-brand);
-          border-radius: 8px; transition: width 0.6s ease;
+          height: 100%; background: var(--primary);
+          border-radius: 0.5rem; transition: width 0.6s ease;
         }
-        .attendance-value { font-size: 12px; font-weight: 600; width: 40px; }
+        .attendance-value { font-size: 0.75rem; font-weight: 600; width: 2.5rem; }
         .engagement-metrics {
-          display: flex; gap: 40px; justify-content: center; padding: 20px 0;
+          display: flex; gap: 2.5rem; justify-content: center; padding: 1.25rem 0;
         }
         .engagement-metric { text-align: center; }
         .engagement-circle {
-          width: 80px; height: 80px; border-radius: 50%;
-          background: conic-gradient(var(--accent-blue) var(--pct), rgba(255,255,255,0.06) var(--pct));
+          width: 5rem; height: 5rem; border-radius: 50%;
+          background: conic-gradient(var(--primary) var(--pct), rgba(255,255,255,0.06) var(--pct));
           display: flex; align-items: center; justify-content: center;
-          font-size: 16px; font-weight: 700; position: relative;
+          font-size: 1rem; font-weight: 700; position: relative;
         }
         .engagement-circle::before {
-          content: ''; position: absolute; inset: 6px;
+          content: ''; position: absolute; inset: 0.375rem;
           border-radius: 50%; background: var(--bg-secondary);
         }
         .engagement-circle span { position: relative; z-index: 1; }
-        .recommendations { display: flex; flex-direction: column; gap: 12px; }
+        .recommendations { display: flex; flex-direction: column; gap: 0.75rem; }
         .recommendation-item {
-          display: flex; gap: 12px; padding: 12px;
-          background: var(--bg-glass); border-radius: var(--radius-sm);
-          border: 1px solid var(--border-glass);
+          display: flex; gap: 0.75rem; padding: 0.75rem;
+          background: var(--bg-elevated); border-radius: var(--radius-sm);
+          border: 0.0625rem solid var(--border);
         }
-        .rec-emoji { font-size: 20px; flex-shrink: 0; }
+        .rec-emoji { font-size: 1.25rem; flex-shrink: 0; }
         .recommendation-item p {
-          font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+          font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;
         }
       `}</style>
         </div>

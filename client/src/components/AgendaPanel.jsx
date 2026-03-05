@@ -6,6 +6,7 @@ import {
   CheckmarkCircle01Icon,
   Clock01Icon,
   Add01Icon,
+  ViewAgendaIcon
 } from '@hugeicons/core-free-icons';
 
 export default function AgendaPanel({ agendaItems, onItemChange }) {
@@ -77,7 +78,10 @@ export default function AgendaPanel({ agendaItems, onItemChange }) {
     return (
         <div className="agenda-panel panel">
             <div className="section-header">
-                <span className="section-title">📋 Agenda</span>
+				<div className="section-title-container">
+					<Icon icon={ViewAgendaIcon} size={16} />
+                <span className="section-title">Agenda</span>
+				</div>
                 <button className="btn-icon" id="btn-add-agenda">
                     <Icon icon={Add01Icon} size={16} />
                 </button>

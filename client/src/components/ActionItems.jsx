@@ -17,7 +17,7 @@ const statusConfig = {
 export default function ActionItems({ items }) {
     return (
         <div className="action-items-section">
-            <div className="section-header" style={{ borderTop: '1px solid var(--border-glass)' }}>
+            <div className="section-header" style={{ borderTop: '0.0625rem solid var(--border)' }}>
                 <span className="section-title">⚡ Action Items</span>
                 <span className="chip chip-blue">{items.length}</span>
             </div>
@@ -59,40 +59,40 @@ export default function ActionItems({ items }) {
 
             <style>{`
         .action-items-section {
-          border-top: 1px solid var(--border-glass);
+          border-top: 0.0625rem solid var(--border);
         }
         .action-items-list {
-          padding: 8px;
-          max-height: 300px;
+          padding: 0.5rem;
+          max-height: 18.75rem;
           overflow-y: auto;
         }
         .action-item-card {
-          padding: 12px;
-          margin-bottom: 6px;
+          padding: 0.75rem;
+          margin-bottom: 0.375rem;
         }
         .ai-card-top {
           display: flex;
           align-items: flex-start;
-          gap: 8px;
-          margin-bottom: 8px;
+          gap: 0.5rem;
+          margin-bottom: 0.5rem;
         }
         .ai-card-title {
-          font-size: 13px;
+          font-size: 0.8125rem;
           font-weight: 500;
           line-height: 1.4;
         }
         .ai-card-meta {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 0.5rem;
           flex-wrap: wrap;
-          padding-left: 24px;
+          padding-left: 1.5rem;
         }
         .ai-card-assignee, .ai-card-deadline {
           display: flex;
           align-items: center;
-          gap: 4px;
-          font-size: 11px;
+          gap: 0.25rem;
+          font-size: 0.6875rem;
           color: var(--text-muted);
         }
       `}</style>
