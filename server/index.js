@@ -1,8 +1,11 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { Server } = require('socket.io');
+const nodemailer = require('nodemailer');
 
 dotenv.config();
 
@@ -10,6 +13,9 @@ dotenv.config();
 let usingMongo = false;
 let User = null;
 let Meeting = null;
+let Poll = null;
+let Notification = null;
+let RSVP = null;
 try {
     const mongoose = require('mongoose');
     mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/mcms_db')
@@ -20,6 +26,9 @@ try {
         .catch(err => console.log('⚠️  MongoDB not available — using in-memory store:', err.message));
     User = require('./models/User');
     Meeting = require('./models/Meeting');
+    Poll = require('./models/Poll');
+    Notification = require('./models/Notification');
+    RSVP = require('./models/RSVP');
 } catch (e) {
     console.log('⚠️  Mongoose not found — using in-memory store');
 }
@@ -28,11 +37,138 @@ try {
 const inMemoryUsers = [];
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const server = http.createServer(app);
+const PORT = process.env.PORT || 5001;
 const JWT_SECRET = process.env.JWT_SECRET || 'mcms_super_secret_key';
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 app.use(cors());
 app.use(express.json());
+
+// ── Socket.io Setup ──────────────────────────────────────────
+const io = new Server(server, {
+    cors: { origin: '*', methods: ['GET', 'POST'] }
+});
+
+const connectedUsers = new Map();
+
+io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('Authentication required'));
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        socket.userId = decoded.id;
+        next();
+    } catch {
+        next(new Error('Invalid token'));
+    }
+});
+
+io.on('connection', (socket) => {
+    connectedUsers.set(socket.userId, socket.id);
+    socket.join(`user:${socket.userId}`);
+
+    socket.on('disconnect', () => {
+        connectedUsers.delete(socket.userId);
+    });
+});
+
+function emitToUser(userId, event, data) {
+    io.to(`user:${userId.toString()}`).emit(event, data);
+}
+
+// ── Email Setup (Nodemailer) ─────────────────────────────────
+let transporter = null;
+
+async function getMailTransporter() {
+    if (transporter) return transporter;
+
+    if (process.env.SENDGRID_API_KEY) {
+        transporter = nodemailer.createTransport({
+            host: 'smtp.sendgrid.net',
+            port: 587,
+            secure: false,
+            auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
+        });
+        console.log('📧 Using SendGrid for email delivery');
+    } else if (process.env.SMTP_HOST) {
+        transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT) || 587,
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        });
+    } else {
+        const testAccount = await nodemailer.createTestAccount();
+        transporter = nodemailer.createTransport({
+            host: 'smtp.ethereal.email',
+            port: 587,
+            secure: false,
+            auth: { user: testAccount.user, pass: testAccount.pass },
+        });
+        console.log('📧 Using Ethereal test email — preview URLs in console');
+    }
+    return transporter;
+}
+
+function generateRsvpToken(meetingId, userId) {
+    return jwt.sign({ meetingId: meetingId.toString(), userId: userId.toString(), purpose: 'rsvp' }, JWT_SECRET, { expiresIn: '30d' });
+}
+
+async function sendRsvpEmail(meeting, user, slot) {
+    try {
+        const transport = await getMailTransporter();
+        const token = generateRsvpToken(meeting._id, user._id);
+        const baseUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+
+        const makeLink = (response) =>
+            `${baseUrl}/api/rsvp/${meeting._id}/respond?token=${token}&response=${response}`;
+
+        const dateStr = slot ? `${slot.date} at ${slot.time}` : `${meeting.date} at ${meeting.time}`;
+        const jitsiSection = meeting.jitsiUrl
+            ? `<p style="margin:16px 0"><strong>Meeting Link:</strong> <a href="${meeting.jitsiUrl}" style="color:#6366f1">${meeting.jitsiUrl}</a></p>`
+            : '';
+        const locationSection = meeting.location
+            ? `<p><strong>Location:</strong> ${meeting.location}</p>`
+            : '';
+
+        const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1a1a2e">
+  <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px;border-radius:12px 12px 0 0;text-align:center">
+    <h1 style="color:#fff;margin:0;font-size:20px">Meeting Invitation</h1>
+  </div>
+  <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+    <h2 style="margin:0 0 16px;color:#1a1a2e">${meeting.title}</h2>
+    <p><strong>Date/Time:</strong> ${dateStr}</p>
+    <p><strong>Type:</strong> ${meeting.modality}</p>
+    ${locationSection}
+    ${jitsiSection}
+    <p style="margin:24px 0 12px;font-weight:600">Will you attend?</p>
+    <div style="display:flex;gap:12px">
+      <a href="${makeLink('yes')}" style="display:inline-block;padding:10px 28px;background:#22c55e;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Yes</a>
+      <a href="${makeLink('no')}" style="display:inline-block;padding:10px 28px;background:#ef4444;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">No</a>
+      <a href="${makeLink('maybe')}" style="display:inline-block;padding:10px 28px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Maybe</a>
+    </div>
+  </div>
+</body>
+</html>`;
+
+        const info = await transport.sendMail({
+            from: process.env.SMTP_FROM || '"MCMS Platform" <noreply@mcms.app>',
+            to: user.email,
+            subject: `Meeting Invitation: ${meeting.title}`,
+            html,
+        });
+
+        const previewUrl = nodemailer.getTestMessageUrl(info);
+        if (previewUrl) console.log(`📧 Preview RSVP email for ${user.email}: ${previewUrl}`);
+    } catch (err) {
+        console.error('Failed to send RSVP email:', err.message);
+    }
+}
 
 // ─── Auth Helpers ─────────────────────────────────────────────
 const generateToken = (id) => jwt.sign({ id }, JWT_SECRET, { expiresIn: '30d' });
@@ -108,6 +244,34 @@ app.get('/api/auth/me', protect, async (req, res) => {
     }
 });
 
+// ─── USER SEARCH (for participant picker) ─────────────────────
+app.get('/api/users/search', protect, async (req, res) => {
+    try {
+        const q = (req.query.q || '').trim();
+        if (!q || q.length < 2) return res.json([]);
+
+        if (usingMongo && User) {
+            const regex = new RegExp(q, 'i');
+            const users = await User.find({
+                $and: [
+                    { _id: { $ne: req.user.id } },
+                    { $or: [{ name: regex }, { email: regex }] }
+                ]
+            }).select('name email').limit(10);
+            return res.json(users);
+        }
+
+        const lower = q.toLowerCase();
+        const results = inMemoryUsers
+            .filter(u => u._id !== req.user.id && (u.name.toLowerCase().includes(lower) || u.email.includes(lower)))
+            .slice(0, 10)
+            .map(u => ({ _id: u._id, name: u.name, email: u.email }));
+        res.json(results);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
 // ─── Mock Data ────────────────────────────────────────────────
 const meetings = [
     {
@@ -171,20 +335,22 @@ const dashboardStats = {
 app.get('/api/meetings', protect, async (req, res) => {
     try {
         if (usingMongo && Meeting) {
-            const dbMeetings = await Meeting.find({}).sort({ createdAt: -1 });
+            const dbMeetings = await Meeting.find({}).sort({ createdAt: -1 }).populate('participants', 'name email');
             const formatted = dbMeetings.map(m => ({
                 id: m._id,
                 title: m.title,
                 modality: m.modality,
-                date: m.date,
-                time: m.time,
+                date: m.confirmedDate || m.date,
+                time: m.confirmedTime || m.time,
+                location: m.location,
                 host: m.host || 'Unknown',
+                hostId: m.hostId,
                 participants: m.participants,
                 status: m.status,
                 jitsiUrl: m.jitsiUrl,
-                jitsiRoomName: m.jitsiRoomName
+                jitsiRoomName: m.jitsiRoomName,
+                pollId: m.pollId,
             }));
-            // Return DB meetings mixed with mock data so frontend UI isn't empty
             return res.json([...formatted, ...meetings]);
         }
         res.json(meetings);
@@ -195,53 +361,371 @@ app.get('/api/meetings', protect, async (req, res) => {
 
 app.post('/api/meetings', protect, async (req, res) => {
     try {
-        const { title, modality, date, time } = req.body;
-        // Generate unique Jitsi room name
-        const jitsiRoomName = modality !== 'Offline' ? `MCMS-${req.user.id.substring(req.user.id.length - 6)}-${Date.now()}` : null;
-        const jitsiUrl = jitsiRoomName ? `https://meet.jit.si/${jitsiRoomName}` : null;
-        let hostName = 'You';
+        const { title, modality, timeSlots, location, participants } = req.body;
 
+        const jitsiRoomName = modality !== 'Offline'
+            ? `MCMS-${req.user.id.toString().substring(req.user.id.toString().length - 6)}-${Date.now()}`
+            : null;
+        const jitsiUrl = jitsiRoomName ? `https://meet.jit.si/${jitsiRoomName}` : null;
+
+        let hostName = 'You';
         if (usingMongo && User) {
             const userDoc = await User.findById(req.user.id);
             if (userDoc) hostName = userDoc.name;
         }
 
+        const isSingleSlot = timeSlots && timeSlots.length === 1;
+
         if (usingMongo && Meeting) {
             const newMeeting = await Meeting.create({
-                title, modality, date, time, 
-                host: hostName, 
+                title,
+                modality,
+                location: location || null,
+                date: isSingleSlot ? timeSlots[0].date : null,
+                time: isSingleSlot ? timeSlots[0].time : null,
+                confirmedDate: isSingleSlot ? timeSlots[0].date : null,
+                confirmedTime: isSingleSlot ? timeSlots[0].time : null,
+                host: hostName,
                 hostId: req.user.id,
-                jitsiUrl, 
-                jitsiRoomName, 
-                participants: [], 
-                status: 'scheduled'
+                jitsiUrl,
+                jitsiRoomName,
+                participants: participants || [],
+                status: isSingleSlot ? 'scheduled' : 'pending_poll',
             });
+
+            let pollData = null;
+
+            if (timeSlots && timeSlots.length > 1) {
+                const poll = await Poll.create({
+                    meetingId: newMeeting._id,
+                    slots: timeSlots.map(s => ({ date: s.date, time: s.time, votes: [] })),
+                });
+                newMeeting.pollId = poll._id;
+                await newMeeting.save();
+                pollData = { _id: poll._id, slots: poll.slots, status: poll.status };
+
+                if (participants && participants.length > 0) {
+                    for (const pid of participants) {
+                        const notif = await Notification.create({
+                            userId: pid,
+                            type: 'poll_invite',
+                            meetingId: newMeeting._id,
+                            message: `You've been invited to vote on time slots for "${title}"`,
+                        });
+                        emitToUser(pid, 'notification', {
+                            _id: notif._id,
+                            type: notif.type,
+                            meetingId: newMeeting._id,
+                            meetingTitle: title,
+                            message: notif.message,
+                            read: false,
+                            createdAt: notif.createdAt,
+                        });
+                    }
+                }
+            }
+
+            if (isSingleSlot && participants && participants.length > 0) {
+                const participantDocs = await User.find({ _id: { $in: participants } });
+                for (const p of participantDocs) {
+                    sendRsvpEmail(newMeeting, p, timeSlots[0]);
+                    const notif = await Notification.create({
+                        userId: p._id,
+                        type: 'meeting_confirmed',
+                        meetingId: newMeeting._id,
+                        message: `You're invited to "${title}" on ${timeSlots[0].date} at ${timeSlots[0].time}`,
+                    });
+                    emitToUser(p._id, 'notification', {
+                        _id: notif._id,
+                        type: notif.type,
+                        meetingId: newMeeting._id,
+                        meetingTitle: title,
+                        message: notif.message,
+                        read: false,
+                        createdAt: notif.createdAt,
+                    });
+                }
+            }
+
+            const populated = await Meeting.findById(newMeeting._id).populate('participants', 'name email');
+
             return res.status(201).json({
-                id: newMeeting._id,
-                title: newMeeting.title,
-                modality: newMeeting.modality,
-                date: newMeeting.date,
-                time: newMeeting.time,
-                host: newMeeting.host,
-                participants: newMeeting.participants,
-                status: newMeeting.status,
-                jitsiUrl: newMeeting.jitsiUrl,
-                jitsiRoomName: newMeeting.jitsiRoomName
+                id: populated._id,
+                title: populated.title,
+                modality: populated.modality,
+                date: populated.confirmedDate || populated.date,
+                time: populated.confirmedTime || populated.time,
+                location: populated.location,
+                host: populated.host,
+                hostId: populated.hostId,
+                participants: populated.participants,
+                status: populated.status,
+                jitsiUrl: populated.jitsiUrl,
+                jitsiRoomName: populated.jitsiRoomName,
+                pollId: populated.pollId,
+                poll: pollData,
             });
         }
 
+        // In-memory fallback
+        const slot = isSingleSlot ? timeSlots[0] : null;
         const newMeeting = {
-            id: `mtg-${Date.now()}`, title, modality, date, time,
-            host: hostName, participants: [], status: 'scheduled',
+            id: `mtg-${Date.now()}`, title, modality,
+            date: slot?.date, time: slot?.time, location,
+            host: hostName, participants: participants || [],
+            status: isSingleSlot ? 'scheduled' : 'pending_poll',
             jitsiUrl, jitsiRoomName
         };
         meetings.push(newMeeting);
         res.status(201).json(newMeeting);
-    } catch(error) {
+    } catch (error) {
+        console.error('Create meeting error:', error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
+// ─── POLL ROUTES ──────────────────────────────────────────────
+app.get('/api/polls/:meetingId', protect, async (req, res) => {
+    try {
+        if (!usingMongo || !Poll) return res.json(null);
+        const poll = await Poll.findOne({ meetingId: req.params.meetingId });
+        if (!poll) return res.status(404).json({ message: 'Poll not found' });
+
+        const meeting = await Meeting.findById(req.params.meetingId).select('title modality jitsiUrl');
+        res.json({ ...poll.toObject(), meetingTitle: meeting?.title, modality: meeting?.modality, jitsiUrl: meeting?.jitsiUrl });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+app.post('/api/polls/:pollId/vote', protect, async (req, res) => {
+    try {
+        if (!usingMongo || !Poll) return res.status(400).json({ message: 'Database required' });
+
+        const { slotIndex } = req.body;
+        const poll = await Poll.findById(req.params.pollId);
+        if (!poll) return res.status(404).json({ message: 'Poll not found' });
+        if (poll.status === 'resolved') return res.status(400).json({ message: 'Poll already resolved' });
+
+        const userId = req.user.id;
+
+        // Remove previous vote from any slot
+        for (const slot of poll.slots) {
+            slot.votes = slot.votes.filter(v => v.toString() !== userId.toString());
+        }
+
+        if (slotIndex < 0 || slotIndex >= poll.slots.length) {
+            return res.status(400).json({ message: 'Invalid slot index' });
+        }
+
+        poll.slots[slotIndex].votes.push(userId);
+        await poll.save();
+
+        const meeting = await Meeting.findById(poll.meetingId).populate('participants', 'name email');
+        if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
+
+        // +1 for host
+        const totalVoters = meeting.participants.length + 1;
+        const majority = Math.ceil(totalVoters / 2);
+
+        let resolved = false;
+        for (let i = 0; i < poll.slots.length; i++) {
+            if (poll.slots[i].votes.length >= majority) {
+                poll.status = 'resolved';
+                poll.resolvedSlot = i;
+                await poll.save();
+
+                const winSlot = poll.slots[i];
+                meeting.confirmedDate = winSlot.date;
+                meeting.confirmedTime = winSlot.time;
+                meeting.date = winSlot.date;
+                meeting.time = winSlot.time;
+                meeting.status = 'scheduled';
+                await meeting.save();
+
+                // Send RSVP emails and notifications to all participants
+                for (const p of meeting.participants) {
+                    sendRsvpEmail(meeting, p, winSlot);
+                    const notif = await Notification.create({
+                        userId: p._id,
+                        type: 'meeting_confirmed',
+                        meetingId: meeting._id,
+                        message: `"${meeting.title}" is confirmed for ${winSlot.date} at ${winSlot.time}`,
+                    });
+                    emitToUser(p._id, 'notification', {
+                        _id: notif._id,
+                        type: notif.type,
+                        meetingId: meeting._id,
+                        meetingTitle: meeting.title,
+                        message: notif.message,
+                        read: false,
+                        createdAt: notif.createdAt,
+                    });
+                }
+
+                // Notify host too
+                const hostNotif = await Notification.create({
+                    userId: meeting.hostId,
+                    type: 'meeting_confirmed',
+                    meetingId: meeting._id,
+                    message: `Your meeting "${meeting.title}" is confirmed for ${winSlot.date} at ${winSlot.time}`,
+                });
+                emitToUser(meeting.hostId, 'notification', {
+                    _id: hostNotif._id,
+                    type: hostNotif.type,
+                    meetingId: meeting._id,
+                    meetingTitle: meeting.title,
+                    message: hostNotif.message,
+                    read: false,
+                    createdAt: hostNotif.createdAt,
+                });
+
+                resolved = true;
+                break;
+            }
+        }
+
+        // Broadcast updated poll to all interested users
+        const allUserIds = [meeting.hostId.toString(), ...meeting.participants.map(p => p._id.toString())];
+        for (const uid of allUserIds) {
+            emitToUser(uid, 'poll_updated', {
+                pollId: poll._id,
+                meetingId: meeting._id,
+                slots: poll.slots,
+                status: poll.status,
+                resolvedSlot: poll.resolvedSlot,
+                resolved,
+            });
+        }
+
+        res.json({
+            poll: poll.toObject(),
+            resolved,
+            meeting: resolved ? {
+                id: meeting._id,
+                confirmedDate: meeting.confirmedDate,
+                confirmedTime: meeting.confirmedTime,
+                jitsiUrl: meeting.jitsiUrl,
+            } : null,
+        });
+    } catch (error) {
+        console.error('Vote error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// ─── NOTIFICATION ROUTES ──────────────────────────────────────
+app.get('/api/notifications', protect, async (req, res) => {
+    try {
+        if (!usingMongo || !Notification) return res.json([]);
+        const notifs = await Notification.find({ userId: req.user.id })
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .populate('meetingId', 'title');
+        res.json(notifs);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+app.patch('/api/notifications/:id/read', protect, async (req, res) => {
+    try {
+        if (!usingMongo || !Notification) return res.json({ success: true });
+        await Notification.findByIdAndUpdate(req.params.id, { read: true });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+app.patch('/api/notifications/read-all', protect, async (req, res) => {
+    try {
+        if (!usingMongo || !Notification) return res.json({ success: true });
+        await Notification.updateMany({ userId: req.user.id, read: false }, { read: true });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// ─── RSVP ROUTES ──────────────────────────────────────────────
+app.get('/api/rsvp/:meetingId', protect, async (req, res) => {
+    try {
+        if (!usingMongo || !RSVP) return res.json([]);
+        const rsvps = await RSVP.find({ meetingId: req.params.meetingId }).populate('userId', 'name email');
+        res.json(rsvps);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+app.post('/api/rsvp/:meetingId', protect, async (req, res) => {
+    try {
+        if (!usingMongo || !RSVP) return res.status(400).json({ message: 'Database required' });
+
+        const { response } = req.body;
+        if (!['yes', 'no', 'maybe'].includes(response)) {
+            return res.status(400).json({ message: 'Invalid response' });
+        }
+
+        const rsvp = await RSVP.findOneAndUpdate(
+            { meetingId: req.params.meetingId, userId: req.user.id },
+            { response, respondedAt: new Date() },
+            { upsert: true, new: true }
+        );
+        res.json(rsvp);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
+
+// Token-based RSVP from email — no auth required
+app.get('/api/rsvp/:meetingId/respond', async (req, res) => {
+    try {
+        const { token, response } = req.query;
+        if (!token || !response || !['yes', 'no', 'maybe'].includes(response)) {
+            return res.status(400).send(rsvpPage('Invalid link', '', response));
+        }
+
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.purpose !== 'rsvp' || decoded.meetingId !== req.params.meetingId) {
+            return res.status(400).send(rsvpPage('Invalid or expired link', '', response));
+        }
+
+        if (usingMongo && RSVP) {
+            await RSVP.findOneAndUpdate(
+                { meetingId: req.params.meetingId, userId: decoded.userId },
+                { response, respondedAt: new Date() },
+                { upsert: true, new: true }
+            );
+        }
+
+        const meeting = usingMongo && Meeting ? await Meeting.findById(req.params.meetingId) : null;
+        const title = meeting ? meeting.title : 'Meeting';
+        res.send(rsvpPage(`Your response "${response}" has been recorded for`, title, response));
+    } catch (error) {
+        res.status(400).send(rsvpPage('This link has expired or is invalid', '', ''));
+    }
+});
+
+function rsvpPage(message, meetingTitle, response) {
+    const colorMap = { yes: '#22c55e', no: '#ef4444', maybe: '#f59e0b' };
+    const accent = colorMap[response] || '#6366f1';
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RSVP — MCMS</title></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f3f4f6">
+<div style="background:#fff;padding:40px;border-radius:16px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.08);max-width:420px">
+  <div style="width:56px;height:56px;border-radius:50%;background:${accent};margin:0 auto 20px;display:flex;align-items:center;justify-content:center">
+    <span style="color:#fff;font-size:24px">${response === 'yes' ? '✓' : response === 'no' ? '✗' : '?'}</span>
+  </div>
+  <h2 style="margin:0 0 8px;color:#1a1a2e">${message}</h2>
+  ${meetingTitle ? `<p style="color:#6366f1;font-weight:600;font-size:18px">${meetingTitle}</p>` : ''}
+  <p style="color:#6b7280;margin-top:20px">You can close this tab.</p>
+</div></body></html>`;
+}
+
+// ─── Existing data routes ─────────────────────────────────────
 app.get('/api/agenda/:meetingId', protect, (req, res) => res.json(agendas[req.params.meetingId] || []));
 app.get('/api/transcript/:meetingId', protect, (req, res) => res.json(transcripts[req.params.meetingId] || []));
 app.get('/api/action-items/:meetingId', protect, (req, res) => res.json(actionItems[req.params.meetingId] || []));
@@ -253,7 +737,7 @@ app.get('/api/dashboard/stats', protect, (req, res) => {
 });
 
 // ─── Start Server ────────────────────────────────────────────
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`✅ MCMS Backend running at http://localhost:${PORT}`);
     console.log(`   MongoDB: ${usingMongo ? 'Connected' : 'Not running — users stored in-memory (lost on restart)'}`);
 });

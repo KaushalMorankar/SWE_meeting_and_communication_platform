@@ -5,12 +5,16 @@ const meetingSchema = new mongoose.Schema({
     modality: { type: String, default: 'Online' },
     date: { type: String },
     time: { type: String },
-    host: { type: String }, // Storing host name string for now based on mock, can convert to ObjectId later
+    confirmedDate: { type: String },
+    confirmedTime: { type: String },
+    location: { type: String },
+    host: { type: String },
     hostId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    participants: [String],
-    status: { type: String, default: 'scheduled', enum: ['scheduled', 'in-progress', 'completed', 'cancelled'] },
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    pollId: { type: mongoose.Schema.Types.ObjectId, ref: 'Poll' },
+    status: { type: String, default: 'pending_poll', enum: ['pending_poll', 'scheduled', 'in-progress', 'completed', 'cancelled'] },
     jitsiUrl: { type: String },
-    jitsiRoomName: { type: String }, // Random unique string to act as the room name
+    jitsiRoomName: { type: String },
 }, {
     timestamps: true
 });
