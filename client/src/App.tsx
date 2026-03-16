@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactNode, FC } from "react";
 import "./index.css";
 import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
@@ -15,30 +15,85 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import { useAuth } from "./context/AuthContext";
 
+interface Meeting {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  host: string;
+  status: 'scheduled' | 'completed';
+  modality: 'Online' | 'Offline' | 'Hybrid';
+  jitsiRoomName?: string;
+  participants?: string[];
+}
+
+interface DashboardStats {
+  streak: number;
+  user: string;
+  totalMeetings: number;
+  totalHours: number;
+  punctualityRate: number;
+  tasksCompleted: number;
+  tasksTotal: number;
+  weeklyHeatmap: Array<{ date: string; hours: number }>;
+}
+
+interface AgendaItem {
+  id: string;
+  title: string;
+  duration: number;
+  status: 'active' | 'completed' | 'pending';
+}
+
+interface TranscriptEntry {
+  id: string;
+  speaker: string;
+  text: string;
+  sentiment: 'positive' | 'neutral' | 'negative';
+  timestamp: string;
+}
+
+interface ActionItem {
+  id: string;
+  title: string;
+  status: 'completed' | 'in-progress' | 'pending';
+  category: string;
+  assignee: string;
+  deadline: string;
+}
+
+interface MeetingFormData {
+  title: string;
+  modality: 'Online' | 'Offline' | 'Hybrid';
+  timeSlots: Array<{ date: string; time: string }>;
+}
+
 const API_BASE = "http://localhost:5000/api";
 
-function DashboardApp() {
+interface DashboardAppProps {}
+
+const DashboardApp: FC<DashboardAppProps> = () => {
   const { user, logout } = useAuth();
 
-  const [currentView, setCurrentView] = useState("dashboard");
+  const [currentView, setCurrentView] = useState<string>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
-  const [theme, setTheme] = useState(() => {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window === "undefined") return "dark";
     return window.localStorage.getItem("theme") === "light" ? "light" : "dark";
   });
 
   // Data state
-  const [meetings, setMeetings] = useState([]);
-  const [agendaItems, setAgendaItems] = useState([]);
-  const [transcripts, setTranscripts] = useState([]);
-  const [actionItems, setActionItems] = useState([]);
-  const [dashboardStats, setDashboardStats] = useState(null);
-  const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
+  const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
+  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
   // Helper for authenticated requests
-  const fetchWithAuth = async (url, options = {}) => {
-    const headers = {
+  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const headers: HeadersInit = {
       "Content-Type": "application/json",
       ...options.headers,
     };
@@ -85,7 +140,7 @@ function DashboardApp() {
     }
   };
 
-  const fetchAgenda = async (meetingId) => {
+  const fetchAgenda = async (meetingId: string) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/agenda/${meetingId}`);
       if (res.ok) setAgendaItems(await res.json());
@@ -94,7 +149,7 @@ function DashboardApp() {
     }
   };
 
-  const fetchTranscript = async (meetingId) => {
+  const fetchTranscript = async (meetingId: string) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/transcript/${meetingId}`);
       if (res.ok) setTranscripts(await res.json());
@@ -103,7 +158,7 @@ function DashboardApp() {
     }
   };
 
-  const fetchActionItems = async (meetingId) => {
+  const fetchActionItems = async (meetingId: string) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/action-items/${meetingId}`);
       if (res.ok) setActionItems(await res.json());
@@ -121,7 +176,7 @@ function DashboardApp() {
     }
   };
 
-  const handleCreateMeeting = async (meetingData) => {
+  const handleCreateMeeting = async (meetingData: MeetingFormData) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/meetings`, {
         method: "POST",
@@ -157,9 +212,9 @@ function DashboardApp() {
             <VideoArea
               meetingTitle={selectedMeeting?.title || "Select a Meeting"}
               participants={selectedMeeting?.participants || []}
-              jitsiRoomName={selectedMeeting?.jitsiRoomName}
-              modality={selectedMeeting?.modality}
-              currentUser={user}
+              jitsiRoomName={selectedMeeting?.jitsiRoomName || ""}
+              modality={selectedMeeting?.modality || 'Online'}
+              currentUser={user ? { name: user.name } : null}
             />
             <div
               className="panel"
@@ -296,7 +351,6 @@ function DashboardApp() {
           currentView={currentView}
           onViewChange={setCurrentView}
           collapsed={sidebarCollapsed}
-          onLogout={logout}
         />
 
         <div className="content-area">{renderContent()}</div>
@@ -310,12 +364,14 @@ function DashboardApp() {
       )}
     </div>
   );
-}
+};
 
 // Main App component that maps auth states to the correct UI
-export default function App() {
+interface AppProps {}
+
+const App: FC<AppProps> = () => {
   const { user, loading } = useAuth();
-  const [authView, setAuthView] = useState("login"); // 'login' or 'signup'
+  const [authView, setAuthView] = useState<"login" | "signup">("login");
 
   if (loading) {
     return (
@@ -337,10 +393,12 @@ export default function App() {
 
   // If not authenticated, show login or signup pages
   if (!user) {
-    if (authView === "login") return <Login onNavigate={setAuthView} />;
-    if (authView === "signup") return <Signup onNavigate={setAuthView} />;
+    if (authView === "login") return <Login onNavigate={(view) => setAuthView(view as "login" | "signup")} />;
+    if (authView === "signup") return <Signup onNavigate={(view) => setAuthView(view as "login" | "signup")} />;
   }
 
   // If authenticated, show the main dashboard
   return <DashboardApp />;
-}
+};
+
+export default App;
