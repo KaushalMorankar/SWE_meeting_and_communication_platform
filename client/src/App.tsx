@@ -22,7 +22,7 @@ import Signup from "./pages/Signup";
 import { useAuth } from "./context/AuthContext";
 import { useSocket } from "./context/SocketContext";
 
-const API_BASE = "http://localhost:5001/api";
+const API_BASE = "http://localhost:5000/api";
 
 const VIEW_KEYS = ['dashboard', 'meeting', 'schedule', 'archive', 'analytics', 'settings', 'profile'];
 
