@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useState, useEffect, ReactNode, FC } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, ReactNode, FC } from "react";
 import "./index.css";
 import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
@@ -96,19 +95,18 @@ const DashboardApp: FC<DashboardAppProps> = () => {
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
   const [pollMeetingId, setPollMeetingId] = useState(null);
   const searchInputRef = useRef(null);
-  const [theme, setTheme] = useState(() => {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window === "undefined") return "dark";
     return window.localStorage.getItem("theme") === "light" ? "light" : "dark";
   });
 
   // Data state
-  const [meetings, setMeetings] = useState([]);
-  const [agendaItems, setAgendaItems] = useState([]);
-  const [transcripts, setTranscripts] = useState([]);
-  const [actionItems, setActionItems] = useState([]);
-  const [dashboardStats, setDashboardStats] = useState(null);
-  const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
+  const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
+  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
   const [agendaPanelOpen, setAgendaPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -145,12 +143,6 @@ const DashboardApp: FC<DashboardAppProps> = () => {
 
   useKeyboardShortcuts(shortcuts);
   useTranscriptionCapture(socket, selectedMeeting?.id, user);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
-  const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
-  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
-  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
   // Helper for authenticated requests
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
@@ -329,22 +321,6 @@ const DashboardApp: FC<DashboardAppProps> = () => {
                 </div>
               </div>
             )}
-              jitsiRoomName={selectedMeeting?.jitsiRoomName || ""}
-              modality={selectedMeeting?.modality || 'Online'}
-              currentUser={user ? { name: user.name } : null}
-            />
-            <div
-              className="panel"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                background: "var(--bg-card)",
-              }}
-            >
-              <TranscriptFeed transcripts={transcripts} />
-              <ActionItems items={actionItems} />
-              <LiveOutcome />
-            </div>
           </div>
         );
 
