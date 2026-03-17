@@ -60,7 +60,7 @@ export default function ProductivityDashboard({ stats, userName }: ProductivityD
     const maxHours = Math.max(...stats.weeklyHeatmap.map(d => d.hours));
 
     return (
-        <div className="productivity-dashboard">
+        <div className="productivity-dashboard" style={{ width: '100%', maxWidth: '100%' }}>
             <div className="page-header">
                 <div>
                     <h2 style={{ fontSize: 'var(--font-size-title3)', fontWeight: 600, marginBottom: 'var(--lk-size-2xs)', letterSpacing: '-0.022em' }}>
