@@ -142,7 +142,11 @@ const DashboardApp: FC<DashboardAppProps> = () => {
 
   useEffect(() => {
     if (selectedMeeting?.id) {
-      fetchAgenda(selectedMeeting.id);
+      if (selectedMeeting.status === "scheduled") {
+        fetchAgenda(selectedMeeting.id);
+      } else {
+        fetchAgenda(selectedMeeting.id);
+      }
     }
   }, [selectedMeeting?.id]);
 
@@ -177,7 +181,7 @@ const DashboardApp: FC<DashboardAppProps> = () => {
       const res = await fetchWithAuth(`${API_BASE}/agenda/${meetingId}`);
       if (res.ok) {
         const data = await res.json();
-        setAgendaItems(Array.isArray(data) ? data : []);
+        setAgendaItems(data?.items || []);
       }
     } catch (err) {
       console.error("Failed to fetch agenda:", err);
@@ -185,14 +189,34 @@ const DashboardApp: FC<DashboardAppProps> = () => {
   };
 
 
-  const handleCreateMeeting = async (meetingData: MeetingFormData) => {
+  const handleCreateMeeting = async (meetingData: MeetingFormData & { agenda?: string[] }) => {
     try {
+      const { agenda, ...baseMeetingData } = meetingData;
       const res = await fetchWithAuth(`${API_BASE}/meetings`, {
         method: "POST",
-        body: JSON.stringify(meetingData),
+        body: JSON.stringify(baseMeetingData),
       });
       if (res.ok) {
         const newMeeting = await res.json();
+        
+        // Save initial agenda items if provided
+        if (agenda && agenda.length > 0) {
+          const formattedItems = agenda.map((title, index) => ({
+            id: `ag-${Date.now()}-${index}`,
+            title,
+            duration: 15,
+            status: 'pending' as const
+          }));
+          
+          await fetchWithAuth(`${API_BASE}/agenda/${newMeeting.id || newMeeting._id}`, {
+            method: "POST",
+            body: JSON.stringify({
+              items: formattedItems,
+              totalDuration: formattedItems.length * 15
+            })
+          });
+        }
+        
         setMeetings((prev) => [newMeeting, ...prev]);
         setSelectedMeeting(newMeeting);
         return newMeeting;
@@ -260,7 +284,18 @@ const DashboardApp: FC<DashboardAppProps> = () => {
               <div className="meeting-side-panel meeting-side-panel-left open" style={{ width: '18.75rem', flexShrink: 0, height: '100%' }}>
                 <AgendaPanel
                   agendaItems={agendaItems}
-                  onItemChange={setAgendaItems}
+                  onItemChange={async (newItems) => {
+                    setAgendaItems(newItems);
+                    if (selectedMeeting?.id) {
+                       await fetchWithAuth(`${API_BASE}/agenda/${selectedMeeting.id}`, {
+                         method: "POST",
+                         body: JSON.stringify({
+                           items: newItems,
+                           totalDuration: newItems.reduce((acc, curr) => acc + curr.duration, 0)
+                         })
+                       });
+                    }
+                  }}
                 />
               </div>
             )}

@@ -8,6 +8,7 @@ import {
   Link01Icon,
   Delete02Icon,
   Clock01Icon,
+  Add01Icon,
 } from '@hugeicons/core-free-icons';
 import * as chrono from 'chrono-node';
 
@@ -25,8 +26,11 @@ interface TimeSlot {
 
 interface MeetingFormData {
   title: string;
+  description?: string;
+  duration: number;
   modality: 'Online' | 'Offline' | 'Hybrid';
   timeSlots: Array<{ date: string; time: string }>;
+  agenda?: string[];
 }
 
 interface MeetingCreationProps {
@@ -151,7 +155,10 @@ function buildSuggestions(query: string): Suggestion[] {
 
 const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [duration, setDuration] = useState<number>(30);
   const [modality, setModality] = useState<'Online' | 'Offline' | 'Hybrid'>('Online');
+  const [agenda, setAgenda] = useState<string[]>(['']);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -266,6 +273,20 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
     if (!showDropdown) openDropdown();
   };
 
+  const handleAgendaChange = (index: number, value: string) => {
+    const newAgenda = [...agenda];
+    newAgenda[index] = value;
+    setAgenda(newAgenda);
+  };
+
+  const addAgendaItem = () => {
+    setAgenda([...agenda, '']);
+  };
+
+  const removeAgendaItem = (index: number) => {
+    setAgenda(agenda.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const filledSlots = slots.filter(s => s.date);
@@ -276,7 +297,10 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
     }
     onSubmit({
       title,
+      description,
+      duration,
       modality,
+      agenda: agenda.filter(a => a.trim() !== ''),
       timeSlots: filledSlots.map(s => ({
         date: s.date.toISOString().split('T')[0],
         time: s.date.toTimeString().slice(0, 5),
@@ -309,6 +333,56 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
             />
           </div>
 
+          <div className="form-group">
+            <label className="form-label">Description (Optional)</label>
+            <textarea
+              className="input"
+              placeholder="What is this meeting about?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              style={{ resize: 'vertical', fontFamily: 'inherit' }}
+              id="input-meeting-description"
+            />
+          </div>
+
+          <div className="form-group">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <label className="form-label">Agenda Items (Optional)</label>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {agenda.map((item, index) => (
+                <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder={`e.g., Review Q3 OKRs`}
+                    value={item}
+                    onChange={(e) => handleAgendaChange(index, e.target.value)}
+                    style={{ flex: 1, marginTop: 0 }}
+                  />
+                  <button 
+                    type="button" 
+                    className="btn-icon" 
+                    onClick={() => removeAgendaItem(index)}
+                    style={{ width: '32px', height: '32px', flexShrink: 0 }}
+                  >
+                    <Icon icon={Delete02Icon} size={16} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={addAgendaItem}
+                style={{ width: 'fit-content', fontSize: '13px', padding: '4px 12px', marginTop: '4px' }}
+              >
+                <Icon icon={Add01Icon} size={14} /> Add Agenda Item
+              </button>
+            </div>
+          </div>
+
           <div className="form-group" style={{ marginBottom: '8px' }}>
             <label className="form-label">Meeting Modality</label>
             <div className="modality-options">
@@ -329,16 +403,22 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
             </div>
           </div>
 
-          {modality === 'Online' && (
-            <div className="form-group" style={{
-              padding: '0', background: 'none',
-              borderRadius: 'var(--radius-sm)', border: 'none'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--accent-blue)' }}>
-                A Jitsi Meet URL will be auto-generated
-              </div>
-            </div>
-          )}
+          <div className="form-group">
+            <label className="form-label">Duration (minutes)</label>
+            <select 
+              className="input" 
+              value={duration} 
+              onChange={e => setDuration(Number(e.target.value))}
+              id="input-meeting-duration"
+            >
+              <option value={15}>15 minutes</option>
+              <option value={30}>30 minutes</option>
+              <option value={45}>45 minutes</option>
+              <option value={60}>1 hour</option>
+              <option value={90}>1.5 hours</option>
+              <option value={120}>2 hours</option>
+            </select>
+          </div>
 
           {(modality === 'Offline' || modality === 'Hybrid') && (
             <div className="form-group">

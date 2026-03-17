@@ -1151,6 +1151,131 @@ select.input { appearance: none; cursor: pointer; }
   line-height: var(--lk-halfstep);
 }
 
+.nldate-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.nldate-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--lk-size-xs);
+  width: 100%;
+  padding: var(--lk-size-xs) var(--lk-size-sm);
+  background: var(--bg-elevated);
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.2s ease;
+}
+
+.nldate-input-row:focus-within {
+  border-color: var(--primary);
+}
+
+.nldate-input-row.nldate-error {
+  border-color: var(--accent-rose);
+}
+
+.nldate-icon {
+  color: var(--text-muted);
+}
+
+.nldate-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: var(--font-size-label);
+  outline: none;
+}
+
+.nldate-input::placeholder {
+  color: var(--text-muted);
+}
+
+.nldate-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nldate-clear:hover {
+  color: var(--text-primary);
+}
+
+.nldate-dropdown {
+  position: absolute;
+  background: var(--bg-elevated);
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  max-height: 15rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.nldate-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--lk-size-xs) var(--lk-size-sm);
+  background: transparent;
+  border: none;
+  border-bottom: 0.0625rem solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.nldate-option:last-child {
+  border-bottom: none;
+}
+
+.nldate-option:hover,
+.nldate-option.highlighted {
+  background: var(--bg-hover);
+}
+
+.nldate-option-label {
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.nldate-option-detail {
+  font-size: var(--font-size-caption);
+  color: var(--text-muted);
+}
+
+.slot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--lk-size-xs) var(--lk-size-sm);
+  background: var(--bg-card);
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: var(--lk-size-xs);
+}
+
+.slot-row-content {
+  display: flex;
+  align-items: center;
+  gap: var(--lk-size-xs);
+  font-size: var(--font-size-label);
+  color: var(--text-primary);
+}
+
+.slot-row-icon {
+  color: var(--primary);
+}
+
 
 /* ═══════════════════════════════════════════════════════════════
    21. MEETING LIST
