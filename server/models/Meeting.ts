@@ -1,15 +1,18 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-interface IMeeting extends Document {
-  _id: any;
+export interface IMeeting extends Document {
   title: string;
-  modality: 'Online' | 'Offline' | 'Hybrid';
+  modality: string;
   date?: string;
   time?: string;
+  confirmedDate?: string;
+  confirmedTime?: string;
+  location?: string;
   host?: string;
   hostId?: mongoose.Types.ObjectId;
-  participants: string[];
-  status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
+  participants: mongoose.Types.ObjectId[];
+  pollId?: mongoose.Types.ObjectId;
+  status: 'pending_poll' | 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
   jitsiUrl?: string;
   jitsiRoomName?: string;
   createdAt: Date;
@@ -17,18 +20,22 @@ interface IMeeting extends Document {
 }
 
 const meetingSchema = new Schema({
-  title: { type: String, required: true },
-  modality: { type: String, default: 'Online', enum: ['Online', 'Offline', 'Hybrid'] },
-  date: { type: String },
-  time: { type: String },
-  host: { type: String },
-  hostId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  participants: [String],
-  status: { type: String, default: 'scheduled', enum: ['scheduled', 'in-progress', 'completed', 'cancelled'] },
-  jitsiUrl: { type: String },
-  jitsiRoomName: { type: String },
+    title: { type: String, required: true },
+    modality: { type: String, default: 'Online' },
+    date: { type: String },
+    time: { type: String },
+    confirmedDate: { type: String },
+    confirmedTime: { type: String },
+    location: { type: String },
+    host: { type: String },
+    hostId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    pollId: { type: mongoose.Schema.Types.ObjectId, ref: 'Poll' },
+    status: { type: String, default: 'pending_poll', enum: ['pending_poll', 'scheduled', 'in-progress', 'completed', 'cancelled'] },
+    jitsiUrl: { type: String },
+    jitsiRoomName: { type: String },
 }, {
-  timestamps: true
+    timestamps: true
 });
 
 export default mongoose.model<IMeeting>('Meeting', meetingSchema);

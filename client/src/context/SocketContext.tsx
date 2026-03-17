@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, FC } from 'react';
 import io, { Socket } from 'socket.io-client';
+import { useAuth } from './AuthContext';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -15,13 +16,23 @@ interface SocketProviderProps {
 export const SocketProvider: FC<SocketProviderProps> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
+    if (!user?.token) {
+      setSocket(null);
+      setIsConnected(false);
+      return;
+    }
+
     const newSocket = io('http://localhost:5000', {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
+      auth: {
+        token: user.token,
+      },
     });
 
     newSocket.on('connect', () => {
@@ -37,7 +48,7 @@ export const SocketProvider: FC<SocketProviderProps> = ({ children }) => {
     return () => {
       newSocket.disconnect();
     };
-  }, []);
+  }, [user?.token]);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>

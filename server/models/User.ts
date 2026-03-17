@@ -5,6 +5,7 @@ interface IUser extends Document {
   name: string;
   email: string;
   password: string;
+  profileImage?: string;
   createdAt: Date;
   matchPassword: (enteredPassword: string) => Promise<boolean>;
 }
@@ -23,6 +24,10 @@ const userSchema = new Schema({
   password: {
     type: String,
     required: true,
+  },
+  profileImage: {
+    type: String,
+    default: null,
   },
   createdAt: {
     type: Date,

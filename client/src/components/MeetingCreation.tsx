@@ -88,7 +88,6 @@ function buildSuggestions(query: string): Suggestion[] {
     seen.add(key);
 
     const hasTime = result.start.isCertain('hour');
-    const dayStr = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
     const timeStr = hasTime ? ` at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : '';
 
     const datePart = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long' });
@@ -165,7 +164,7 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const inputRowRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const labelTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const labelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
   const updateDropdownPos = useCallback(() => {

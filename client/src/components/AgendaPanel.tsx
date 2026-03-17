@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef, FC } from 'react';
+import { FC, useState } from 'react';
 import Icon from './Icon';
 import {
-  PlayIcon,
-  PauseIcon,
-  CheckmarkCircle01Icon,
-  Clock01Icon,
   Add01Icon,
+  Clock01Icon,
+  CheckmarkSquare01Icon,
+  Cancel01Icon,
 } from '@hugeicons/core-free-icons';
 
 interface AgendaItem {
@@ -20,129 +19,123 @@ interface AgendaPanelProps {
   onItemChange?: (items: AgendaItem[]) => void;
 }
 
-const AgendaPanel: FC<AgendaPanelProps> = ({ agendaItems, onItemChange }) => {
-  const [items, setItems] = useState<AgendaItem[]>(agendaItems);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+const AgendaPanel: FC<AgendaPanelProps> = ({ agendaItems = [], onItemChange }) => {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDuration, setNewDuration] = useState('15');
 
-  useEffect(() => { 
-    setItems(agendaItems); 
-  }, [agendaItems]);
+  const items = Array.isArray(agendaItems) ? agendaItems : [];
 
-  useEffect(() => {
-    const active = items.find(i => i.status === 'active');
-    if (active) {
-      setActiveId(active.id);
-      setCountdown(active.duration * 60);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeId && countdown > 0) {
-      intervalRef.current = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) { 
-            if (intervalRef.current) clearInterval(intervalRef.current); 
-            return 0; 
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+  const handleAdd = () => {
+    if (!newTitle.trim()) return;
+    const newItem: AgendaItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: newTitle.trim(),
+      duration: parseInt(newDuration) || 15,
+      status: 'pending'
     };
-  }, [activeId]);
-
-  const formatTime = (s: number): string => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, '0')}`;
+    onItemChange?.([...items, newItem]);
+    setNewTitle('');
+    setIsAdding(false);
   };
-
-  const startItem = (id: string) => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    const updated = items.map(item => ({
-      ...item,
-      status: item.id === id ? 'active' as const : (item.status === 'active' ? 'completed' as const : item.status)
-    }));
-    setItems(updated);
-    setActiveId(id);
-    const item = items.find(i => i.id === id);
-    if (item) {
-      setCountdown(item.duration * 60);
-    }
-    onItemChange?.(updated);
-  };
-
-  const pauseItem = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-  };
-
-  const completeItem = (id: string) => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    const updated = items.map(item => ({
-      ...item,
-      status: item.id === id ? 'completed' as const : item.status
-    }));
-    setItems(updated);
-    setActiveId(null);
-    setCountdown(0);
-    onItemChange?.(updated);
-  };
-
-  const activeItem = items.find(i => i.id === activeId);
-  const progress = activeItem ? ((activeItem.duration * 60 - countdown) / (activeItem.duration * 60)) * 100 : 0;
 
   return (
     <div className="agenda-panel panel">
       <div className="section-header">
         <span className="section-title">📋 Agenda</span>
-        <button className="btn-icon" id="btn-add-agenda">
-          <Icon icon={Add01Icon} size={16} />
+        <button 
+          className={`btn-icon ${isAdding ? 'active' : ''}`} 
+          id="btn-add-agenda"
+          onClick={() => setIsAdding(!isAdding)}
+        >
+          <Icon icon={isAdding ? Cancel01Icon : Add01Icon} size={16} />
         </button>
       </div>
 
-      {activeId && (
-        <div className="agenda-timer-bar">
-          <div className="timer-display">
-            <Icon icon={Clock01Icon} size={14} />
-            <span className="timer-value">{formatTime(countdown)}</span>
-            <span className="timer-label">remaining</span>
+      {isAdding && (
+        <div className="item-add-form" style={{ 
+          padding: '1rem', 
+          background: 'var(--bg-elevated)', 
+          borderRadius: 'var(--radius-md)',
+          marginTop: '1rem',
+          border: '1px solid var(--border)'
+        }}>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Item Title</label>
+            <input 
+              type="text" 
+              placeholder="e.g. Project Update"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--text-primary)',
+                fontSize: '0.875rem'
+              }}
+            />
           </div>
-          <div className="progress-bar">
-            <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Duration (mins)</label>
+            <input 
+              type="number" 
+              placeholder="15"
+              value={newDuration}
+              onChange={(e) => setNewDuration(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                color: 'var(--text-primary)',
+                fontSize: '0.875rem'
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn btn-primary" onClick={handleAdd} style={{ flex: 1, padding: '0.5rem', fontSize: '0.875rem' }}>
+              <Icon icon={CheckmarkSquare01Icon} size={14} />
+              <span style={{ marginLeft: '0.25rem' }}>Add Item</span>
+            </button>
+            <button className="btn btn-secondary" onClick={() => setIsAdding(false)} style={{ padding: '0.5rem', fontSize: '0.875rem' }}>
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
-      <div className="agenda-list">
-        {items.map((item, index) => (
-          <div key={item.id} className={`agenda-item ${item.status}`} id={`agenda-item-${item.id}`}>
-            <div className="agenda-item-content">
-              <span className="agenda-item-title">{item.title}</span>
-              <span className="agenda-item-duration">{item.duration} min</span>
-            </div>
-            <div className="agenda-item-actions">
-              {item.status === 'pending' && (
-                <button onClick={() => startItem(item.id)} className="btn-icon">
-                  <Icon icon={PlayIcon} size={14} />
-                </button>
-              )}
-              {item.status === 'active' && (
-                <>
-                  <button onClick={pauseItem} className="btn-icon">
-                    <Icon icon={PauseIcon} size={14} />
-                  </button>
-                  <button onClick={() => completeItem(item.id)} className="btn-icon">
-                    <Icon icon={CheckmarkCircle01Icon} size={14} />
-                  </button>
-                </>
-              )}
-            </div>
+      <div className="agenda-list" style={{ marginTop: '1rem' }}>
+        {items.length === 0 && !isAdding ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.875rem', padding: '2rem 0' }}>
+            No agenda items for this meeting.
           </div>
-        ))}
+        ) : (
+          items.map(item => (
+            <div key={item.id} className={`agenda-item ${item.status}`} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.75rem',
+              background: 'var(--bg-elevated)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: '0.5rem',
+              border: item.status === 'active' ? '1px solid var(--primary)' : '1px solid var(--border)'
+            }}>
+              <Icon icon={Clock01Icon} size={16} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{item.title}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.duration} mins</div>
+              </div>
+              <div className={`chip chip-${item.status === 'active' ? 'blue' : item.status === 'completed' ? 'emerald' : 'amber'}`} style={{ fontSize: '0.625rem' }}>
+                {item.status}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

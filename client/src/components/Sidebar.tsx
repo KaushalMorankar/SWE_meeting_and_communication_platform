@@ -1,12 +1,9 @@
 import { FC } from 'react';
 import Icon from './Icon';
 import {
-  DashboardSquare01Icon,
   Video01Icon,
   Calendar02Icon,
-  Archive03Icon,
-  BarChartIcon,
-  Settings01Icon,
+  DashboardCircleIcon,
 } from '@hugeicons/core-free-icons';
 
 interface NavItem {
@@ -22,12 +19,9 @@ interface SidebarProps {
 }
 
 const navItems: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: DashboardSquare01Icon },
+  { id: 'dashboard', label: 'Dashboard', icon: DashboardCircleIcon },
   { id: 'meeting', label: 'Live Meeting', icon: Video01Icon },
   { id: 'schedule', label: 'Schedule', icon: Calendar02Icon },
-  { id: 'archive', label: 'Archives', icon: Archive03Icon },
-  { id: 'analytics', label: 'Analytics', icon: BarChartIcon },
-  { id: 'settings', label: 'Settings', icon: Settings01Icon },
 ];
 
 const Sidebar: FC<SidebarProps> = ({ currentView, onViewChange, collapsed }) => {

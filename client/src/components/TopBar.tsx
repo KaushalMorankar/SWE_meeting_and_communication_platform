@@ -3,7 +3,6 @@ import Icon from './Icon';
 import {
   Search01Icon,
   Notification01Icon,
-  FireIcon,
   ArrowDown01Icon,
   UserIcon,
   Moon01Icon,
@@ -13,7 +12,6 @@ import {
 } from '@hugeicons/core-free-icons';
 
 interface TopBarProps {
-  streak: number;
   userName: string;
   onNewMeeting: () => void;
   theme?: 'dark' | 'light';
@@ -32,7 +30,7 @@ function SidebarToggleIcon({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-const TopBar: FC<TopBarProps> = ({ streak, userName, onNewMeeting, theme = 'dark', onToggleTheme, sidebarCollapsed, onSidebarToggle, onLogout }) => {
+const TopBar: FC<TopBarProps> = ({ userName, onNewMeeting, theme = 'dark', onToggleTheme, sidebarCollapsed, onSidebarToggle, onLogout }) => {
   const [showNotif, setShowNotif] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -86,9 +84,6 @@ const TopBar: FC<TopBarProps> = ({ streak, userName, onNewMeeting, theme = 'dark
             <div className="user-avatar">{userName.charAt(0).toUpperCase()}</div>
             <div className="user-info">
               <div className="user-name">{userName}</div>
-              <div className="user-streak">
-                <Icon icon={FireIcon} size={12} /> {streak} day streak
-              </div>
             </div>
             <Icon icon={ArrowDown01Icon} size={14} />
           </button>

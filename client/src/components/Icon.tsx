@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { CSSProperties, ReactNode } from 'react';
+import { CSSProperties } from 'react';
 
 interface IconProps {
   icon: any;
