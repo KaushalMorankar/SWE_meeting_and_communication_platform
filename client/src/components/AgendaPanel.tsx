@@ -123,11 +123,20 @@ const AgendaPanel: FC<AgendaPanelProps> = ({ agendaItems = [], onItemChange }) =
               background: 'var(--bg-elevated)',
               borderRadius: 'var(--radius-sm)',
               marginBottom: '0.5rem',
-              border: item.status === 'active' ? '1px solid var(--primary)' : '1px solid var(--border)'
-            }}>
+              border: item.status === 'active' ? '1px solid var(--primary)' : '1px solid var(--border)',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s, border-color 0.2s'
+            }}
+            onClick={() => {
+              const newStatus = item.status === 'pending' ? 'active' : item.status === 'active' ? 'completed' : 'pending';
+              const updatedItems = items.map(i => i.id === item.id ? { ...i, status: newStatus as any } : i);
+              onItemChange?.(updatedItems);
+            }}
+            title="Click to change status (Pending -> Active -> Completed)"
+            >
               <Icon icon={Clock01Icon} size={16} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.875rem', fontWeight: 500 }}>{item.title}</div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 500, textDecoration: item.status === 'completed' ? 'line-through' : 'none', color: item.status === 'completed' ? 'var(--text-secondary)' : 'var(--text-primary)' }}>{item.title}</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.duration} mins</div>
               </div>
               <div className={`chip chip-${item.status === 'active' ? 'blue' : item.status === 'completed' ? 'emerald' : 'amber'}`} style={{ fontSize: '0.625rem' }}>

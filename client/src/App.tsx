@@ -189,7 +189,7 @@ const DashboardApp: FC<DashboardAppProps> = () => {
   };
 
 
-  const handleCreateMeeting = async (meetingData: MeetingFormData & { agenda?: string[] }) => {
+  const handleCreateMeeting = async (meetingData: MeetingFormData & { agenda?: Array<{ title: string; duration: number }> }) => {
     try {
       const { agenda, ...baseMeetingData } = meetingData;
       const res = await fetchWithAuth(`${API_BASE}/meetings`, {
@@ -201,10 +201,10 @@ const DashboardApp: FC<DashboardAppProps> = () => {
         
         // Save initial agenda items if provided
         if (agenda && agenda.length > 0) {
-          const formattedItems = agenda.map((title, index) => ({
+          const formattedItems = agenda.map((item, index) => ({
             id: `ag-${Date.now()}-${index}`,
-            title,
-            duration: 15,
+            title: item.title,
+            duration: item.duration,
             status: 'pending' as const
           }));
           
@@ -212,7 +212,7 @@ const DashboardApp: FC<DashboardAppProps> = () => {
             method: "POST",
             body: JSON.stringify({
               items: formattedItems,
-              totalDuration: formattedItems.length * 15
+              totalDuration: formattedItems.reduce((acc, curr) => acc + curr.duration, 0)
             })
           });
         }

@@ -30,7 +30,7 @@ interface MeetingFormData {
   duration: number;
   modality: 'Online' | 'Offline' | 'Hybrid';
   timeSlots: Array<{ date: string; time: string }>;
-  agenda?: string[];
+  agenda?: Array<{ title: string; duration: number }>;
 }
 
 interface MeetingCreationProps {
@@ -158,7 +158,7 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState<number>(30);
   const [modality, setModality] = useState<'Online' | 'Offline' | 'Hybrid'>('Online');
-  const [agenda, setAgenda] = useState<string[]>(['']);
+  const [agenda, setAgenda] = useState<Array<{ title: string; duration: number }>>([{ title: '', duration: 15 }]);
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -273,14 +273,14 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
     if (!showDropdown) openDropdown();
   };
 
-  const handleAgendaChange = (index: number, value: string) => {
+  const handleAgendaChange = (index: number, field: 'title' | 'duration', value: string | number) => {
     const newAgenda = [...agenda];
-    newAgenda[index] = value;
+    newAgenda[index] = { ...newAgenda[index], [field]: value };
     setAgenda(newAgenda);
   };
 
   const addAgendaItem = () => {
-    setAgenda([...agenda, '']);
+    setAgenda([...agenda, { title: '', duration: 15 }]);
   };
 
   const removeAgendaItem = (index: number) => {
@@ -300,7 +300,7 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
       description,
       duration,
       modality,
-      agenda: agenda.filter(a => a.trim() !== ''),
+      agenda: agenda.filter(a => a.title.trim() !== ''),
       timeSlots: filledSlots.map(s => ({
         date: s.date.toISOString().split('T')[0],
         time: s.date.toTimeString().slice(0, 5),
@@ -358,10 +358,23 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
                     type="text"
                     className="input"
                     placeholder={`e.g., Review Q3 OKRs`}
-                    value={item}
-                    onChange={(e) => handleAgendaChange(index, e.target.value)}
+                    value={item.title}
+                    onChange={(e) => handleAgendaChange(index, 'title', e.target.value)}
                     style={{ flex: 1, marginTop: 0 }}
                   />
+                  <div style={{ position: 'relative', width: '90px' }}>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="Mins"
+                      value={item.duration}
+                      onChange={(e) => handleAgendaChange(index, 'duration', Number(e.target.value))}
+                      style={{ marginTop: 0, paddingRight: '28px' }}
+                    />
+                    <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'var(--text-tertiary)', pointerEvents: 'none' }}>
+                      min
+                    </span>
+                  </div>
                   <button 
                     type="button" 
                     className="btn-icon" 
