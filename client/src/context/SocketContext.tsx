@@ -25,7 +25,8 @@ export const SocketProvider: FC<SocketProviderProps> = ({ children }) => {
       return;
     }
 
-    const newSocket = io('http://localhost:5000', {
+    const serverUrl = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+    const newSocket = io(serverUrl, {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
