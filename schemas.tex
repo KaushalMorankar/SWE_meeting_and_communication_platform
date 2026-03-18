@@ -1,0 +1,62 @@
+% Schemas in SWE Meeting and Communication Platform
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{enumitem}
+\title{Database Schemas}
+\date{\today}
+\begin{document}
+\maketitle
+
+\section*{Agenda Schema}
+\textbf{File:} server/models/Agenda.ts
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Purpose:} Represents the agenda for a meeting, including a list of agenda items and their details.
+  \item \textbf{Fields:}
+    \begin{itemize}
+      \item \texttt{meetingId}: Reference to the associated meeting (unique).
+      \item \texttt{items}: Array of agenda items, each with id, title, description, duration, status, start/end time, speaker, and notes.
+      \item \texttt{totalDuration}: Total duration of all agenda items.
+      \item \texttt{createdAt}, \texttt{updatedAt}: Timestamps for creation and update.
+    \end{itemize}
+\end{itemize}
+
+\section*{User Schema}
+\textbf{File:} server/models/User.ts
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Purpose:} Stores user information and authentication details.
+  \item \textbf{Fields:}
+    \begin{itemize}
+      \item \texttt{name}: User's name.
+      \item \texttt{email}: User's email (unique, lowercase).
+      \item \texttt{password}: Hashed password.
+      \item \texttt{profileImage}: Optional profile image URL.
+      \item \texttt{createdAt}: Account creation date.
+    \end{itemize}
+  \item Includes password hashing and password comparison methods.
+\end{itemize}
+
+\section*{Meeting Schema}
+\textbf{File:} server/models/Meeting.ts
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Purpose:} Represents a meeting, its scheduling, participants, and status.
+  \item \textbf{Fields:}
+    \begin{itemize}
+      \item \texttt{title}: Meeting title.
+      \item \texttt{modality}: Online or offline mode.
+      \item \texttt{date}, \texttt{time}: Proposed date and time.
+      \item \texttt{confirmedDate}, \texttt{confirmedTime}: Finalized date and time.
+      \item \texttt{location}: Meeting location.
+      \item \texttt{host}: Host's name.
+      \item \texttt{hostId}: Reference to the host user.
+      \item \texttt{participants}: Array of user references.
+      \item \texttt{pollId}: Reference to a poll for scheduling.
+      \item \texttt{status}: Current status (pending, scheduled, in-progress, completed, cancelled).
+      \item \texttt{jitsiUrl}, \texttt{jitsiRoomName}: Video call details.
+      \item \texttt{createdAt}, \texttt{updatedAt}: Timestamps.
+    \end{itemize}
+\end{itemize}
+
+\end{document}
