@@ -27,6 +27,7 @@ interface TimeSlot {
 interface MeetingFormData {
   title: string;
   description?: string;
+  location?: string;
   duration: number;
   modality: 'Online' | 'Offline' | 'Hybrid';
   timeSlots: Array<{ date: string; time: string }>;
@@ -156,6 +157,7 @@ function buildSuggestions(query: string): Suggestion[] {
 const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
   const [duration, setDuration] = useState<number>(30);
   const [modality, setModality] = useState<'Online' | 'Offline' | 'Hybrid'>('Online');
   const [agenda, setAgenda] = useState<Array<{ title: string; duration: number }>>([{ title: '', duration: 15 }]);
@@ -298,6 +300,7 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
     onSubmit({
       title,
       description,
+      location,
       duration,
       modality,
       agenda: agenda.filter(a => a.title.trim() !== ''),
@@ -321,7 +324,10 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Meeting Title</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label className="form-label">Meeting Title</label>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{title.length}/100</span>
+            </div>
             <input
               type="text"
               className="input"
@@ -330,11 +336,15 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
               onChange={(e) => setTitle(e.target.value)}
               required
               id="input-meeting-title"
+              maxLength={100}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Description (Optional)</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label className="form-label">Description (Optional)</label>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{description.length}/500</span>
+            </div>
             <textarea
               className="input"
               placeholder="What is this meeting about?"
@@ -343,6 +353,7 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
               rows={3}
               style={{ resize: 'vertical', fontFamily: 'inherit' }}
               id="input-meeting-description"
+              maxLength={500}
             />
           </div>
 
@@ -354,14 +365,20 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {agenda.map((item, index) => (
                 <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder={`e.g., Review Q3 OKRs`}
-                    value={item.title}
-                    onChange={(e) => handleAgendaChange(index, 'title', e.target.value)}
-                    style={{ flex: 1, marginTop: 0 }}
-                  />
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder={`e.g., Review Q3 OKRs`}
+                      value={item.title}
+                      onChange={(e) => handleAgendaChange(index, 'title', e.target.value)}
+                      style={{ marginTop: 0, width: '100%', paddingRight: '45px' }}
+                      maxLength={200}
+                    />
+                    <span style={{ position: 'absolute', right: '8px', bottom: '8px', fontSize: '10px', color: 'var(--text-tertiary)', pointerEvents: 'none' }}>
+                      {item.title.length}/200
+                    </span>
+                  </div>
                   <div style={{ position: 'relative', width: '90px' }}>
                     <input
                       type="number"
@@ -435,12 +452,18 @@ const MeetingCreation: FC<MeetingCreationProps> = ({ onClose, onSubmit }) => {
 
           {(modality === 'Offline' || modality === 'Hybrid') && (
             <div className="form-group">
-              <label className="form-label">Physical Location</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="form-label">Physical Location</label>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{location.length}/200</span>
+              </div>
               <input
                 type="text"
                 className="input"
                 placeholder="e.g., Room 301, Academic Block A"
                 id="input-location"
+                maxLength={200}
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
               />
             </div>
           )}

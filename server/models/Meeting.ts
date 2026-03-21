@@ -20,13 +20,13 @@ export interface IMeeting extends Document {
 }
 
 const meetingSchema = new Schema({
-    title: { type: String, required: true },
+    title: { type: String, required: true, maxlength: 100 },
     modality: { type: String, default: 'Online' },
     date: { type: String },
     time: { type: String },
     confirmedDate: { type: String },
     confirmedTime: { type: String },
-    location: { type: String },
+    location: { type: String, maxlength: 200 },
     host: { type: String },
     hostId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

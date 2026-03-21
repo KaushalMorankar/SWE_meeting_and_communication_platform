@@ -22,7 +22,7 @@ export interface IAgenda extends Document {
 
 const agendaItemSchema = new Schema({
   id: { type: String, required: true },
-  title: { type: String, required: true },
+  title: { type: String, required: true, maxlength: 200 },
   description: { type: String },
   duration: { type: Number, required: true },
   status: { type: String, enum: ['pending', 'in-progress', 'completed', 'skipped'], default: 'pending' },

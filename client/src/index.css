@@ -174,11 +174,12 @@
   --font-size-display:    4.236rem;
 
   /* ── Surfaces ── */
-  --bg-primary:   var(--flexoki-black);
-  --bg-secondary: var(--flexoki-950);
-  --bg-card:      var(--flexoki-950);
-  --bg-elevated:  var(--flexoki-900);
-  --bg-hover:     var(--flexoki-850);
+  --bg-primary:   #0b0b14; /* Deep Space Dark */
+  --bg-secondary: #11111a;
+  --bg-card:      rgba(23, 23, 35, 0.4);
+  --bg-elevated:  rgba(30, 30, 45, 0.6);
+  --bg-hover:     rgba(45, 45, 65, 0.8);
+  --bg-premium-gradient: radial-gradient(circle at 0% 0%, #16162a 0%, #0b0b14 100%);
 
   /* ── Borders ── */
   --border:        var(--flexoki-800);
@@ -233,18 +234,19 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root[data-theme='light'] {
-  --bg-primary:   var(--flexoki-paper);
-  --bg-secondary: var(--flexoki-50);
-  --bg-card:      var(--flexoki-50);
-  --bg-elevated:  var(--flexoki-100);
-  --bg-hover:     var(--flexoki-150);
+  --bg-primary:   #f5f5f7;
+  --bg-secondary: #ffffff;
+  --bg-card:      rgba(255, 255, 255, 0.5);
+  --bg-elevated:  rgba(255, 255, 255, 0.7);
+  --bg-hover:     rgba(255, 255, 255, 0.9);
+  --bg-premium-gradient: radial-gradient(circle at 100% 100%, #ffffff 0%, #f5f5f7 100%);
+  
+  --border:        rgba(0, 0, 0, 0.08);
+  --border-hover:  rgba(0, 0, 0, 0.12);
 
-  --border:       var(--flexoki-200);
-  --border-hover: var(--flexoki-300);
-
-  --text-primary:   var(--flexoki-900);
-  --text-secondary: var(--flexoki-700);
-  --text-muted:     var(--flexoki-600);
+  --text-primary:   #1d1d1f;
+  --text-secondary: #48484a;
+  --text-muted:     #86868b;
 
   --primary:            var(--flexoki-cyan-600);
   --primary-dark:       var(--flexoki-cyan-800);
@@ -286,7 +288,7 @@ html, body, #root {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "IBM Plex Sans", Segoe UI, Helvetica, Arial, sans-serif;
-  background: var(--bg-primary);
+  background: var(--bg-premium-gradient);
   color: var(--text-primary);
   font-size: var(--font-size-body);
   line-height: var(--lk-wholestep);
@@ -606,7 +608,7 @@ div.hangup-button {
   border-color: var(--primary);
 }
 
-.input::placeholder { color: var(--text-muted); }
+.input::placeholder { color: rgba(58, 169, 159, 0.4); }
 select.input { appearance: none; cursor: pointer; }
 
 
@@ -1561,7 +1563,7 @@ select.input { appearance: none; cursor: pointer; }
   letter-spacing: -0.004em;
 }
 
-.search-box input::placeholder { color: var(--text-muted); }
+.search-box input::placeholder { color: rgba(58, 169, 159, 0.4); }
 
 .topbar-right {
   display: flex;
@@ -2178,9 +2180,17 @@ select.input { appearance: none; cursor: pointer; }
 
 .glass-card {
   background: var(--bg-card);
-  border: 0.0625rem solid var(--border);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 0.0625rem solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
-  transition: border-color 0.2s ease;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.15);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme='dark'] .glass-card {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.4);
 }
 
 .glass-card:hover {
