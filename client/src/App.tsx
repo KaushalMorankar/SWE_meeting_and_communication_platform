@@ -1,163 +1,179 @@
-import { useState, useEffect, useRef, useMemo, useCallback, FC } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import "./index.css";
 import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
 import AgendaPanel from "./components/AgendaPanel";
 import VideoArea from "./components/VideoArea";
+import TranscriptFeed from "./components/TranscriptFeed";
+import ActionItems from "./components/ActionItems";
+import LiveOutcome from "./components/LiveOutcome";
 import MeetingCreation from "./components/MeetingCreation";
 import ProductivityDashboard from "./components/ProductivityDashboard";
+import PollVoting from "./components/PollVoting";
+import ProfileSettings from "./components/ProfileSettings";
+import ArchiveView from "./components/ArchiveView";
+import RubricSidebar from "./components/RubricSidebar";
+import PinModal from "./components/PinModal";
 import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts";
 import Icon from "./components/Icon";
 import { Calendar02Icon, Clock01Icon, UserIcon } from "@hugeicons/core-free-icons";
 
-// Auth Pages
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import { useAuth } from "./context/AuthContext";
 import { useSocket } from "./context/SocketContext";
 
-const API_BASE = `${import.meta.env.VITE_API_URL ?? "http://localhost:5000"}/api`;
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
 
-const VIEW_KEYS = ['dashboard', 'meeting', 'schedule'];
-interface Meeting {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  host: string;
-  status: 'scheduled' | 'completed';
-  modality: 'Online' | 'Offline' | 'Hybrid';
-  jitsiRoomName?: string;
-  participants?: string[];
-}
+const VIEW_KEYS = ['dashboard', 'meeting', 'schedule', 'archive', 'analytics', 'settings', 'profile'];
 
-
-interface MeetingFormData {
-  title: string;
-  modality: 'Online' | 'Offline' | 'Hybrid';
-  timeSlots: Array<{ date: string; time: string }>;
-}
-
-interface AgendaItem {
-  id: string;
-  title: string;
-  duration: number;
-  status: 'active' | 'completed' | 'pending';
-}
-
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   return `${d.getDate()} ${d.toLocaleString("en-US", { month: "short" })} ${d.getFullYear()}`;
 }
 
-interface DashboardAppProps {}
-
-const DashboardApp: FC<DashboardAppProps> = () => {
+function DashboardApp() {
   const { user, logout } = useAuth();
   const { socket } = useSocket();
 
-  const [currentView, setCurrentView] = useState<string>("dashboard");
+  const [currentView, setCurrentView] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+  const [pollMeetingId, setPollMeetingId] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     return window.localStorage.getItem("theme") === "light" ? "light" : "dark";
   });
 
-  // Data state
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
-  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [agendaItems, setAgendaItems] = useState<any[]>([]);
+  const [transcripts, setTranscripts] = useState<any[]>([]);
+  const [actionItems, setActionItems] = useState<any[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<any>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<any>(null);
+  const [pins, setPins] = useState<any[]>([]);
+  const [pinTimestamp, setPinTimestamp] = useState<string | null>(null);
+  const [showPinModal, setShowPinModal] = useState(false);
 
   const [agendaPanelOpen, setAgendaPanelOpen] = useState(true);
-  const meetingLayoutRef = useRef<HTMLDivElement>(null);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [addActionItemTrigger, setAddActionItemTrigger] = useState(0);
+  const [addAgendaItemTrigger, setAddAgendaItemTrigger] = useState(0);
+  const meetingLayoutRef = useRef<HTMLDivElement | null>(null);
+
+  const triggerAddActionItem = useCallback(() => {
+    setRightPanelOpen(true);
+    setAddActionItemTrigger(t => t + 1);
+  }, []);
+
+  const triggerAddAgendaItem = useCallback(() => {
+    setAgendaPanelOpen(true);
+    setAddAgendaItemTrigger(t => t + 1);
+  }, []);
 
   const toggleAgendaPanel = useCallback(() => setAgendaPanelOpen(prev => !prev), []);
+  const toggleRightPanel = useCallback(() => setRightPanelOpen(prev => !prev), []);
   const toggleFullscreen = useCallback(() => {
-    const target: HTMLElement | null = meetingLayoutRef.current;
+    const target = meetingLayoutRef.current;
     if (!target) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else {
-      if (target.requestFullscreen) {
-        target.requestFullscreen().catch(() => {});
-      }
-    }
+    if (document.fullscreenElement) { document.exitFullscreen(); } else { target.requestFullscreen().catch(() => {}); }
   }, []);
 
   const shortcuts = useMemo(() => [
-    { key: 'k', mod: true, handler: () => { const el = searchInputRef.current; if (el) { if (document.activeElement === el) el.blur(); else el.focus(); } }, allowInInput: true },
+    { key: 'k', mod: true, handler: () => { const el = searchInputRef.current; if (document.activeElement === el) el?.blur(); else el?.focus(); }, allowInInput: true },
     { key: 'b', mod: true, handler: () => setSidebarCollapsed(prev => !prev), allowInInput: true },
     { key: 'M', shift: true, handler: () => setShowCreateMeeting(true) },
     { key: 'd', handler: () => setTheme(prev => prev === 'dark' ? 'light' : 'dark') },
     { key: 'f', handler: toggleFullscreen },
     { key: '[', mod: true, handler: () => setAgendaPanelOpen(prev => !prev), allowInInput: true },
-    { key: ']', mod: true, handler: () => {}, allowInInput: true },
-    { key: 'Escape', handler: () => {
-      // no-op block
-    }, allowInInput: true },
-    ...VIEW_KEYS.map((view, i) => ({
-      key: String(i + 1),
-      handler: () => setCurrentView(view),
-    })),
-  ], [toggleFullscreen]);
+    { key: ']', mod: true, handler: () => setRightPanelOpen(prev => !prev), allowInInput: true },
+    { key: 'Escape', handler: () => { if (pollMeetingId) setPollMeetingId(null); }, allowInInput: true },
+    ...VIEW_KEYS.map((view, i) => ({ key: String(i + 1), handler: () => setCurrentView(view) })),
+  ], [pollMeetingId, toggleFullscreen]);
 
   useKeyboardShortcuts(shortcuts);
 
-  // Helper for authenticated requests
-  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+  const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Response> => {
     const headers: Record<string, string> = { "Content-Type": "application/json", ...(options.headers as Record<string, string>) };
     if (user?.token) headers.Authorization = `Bearer ${user.token}`;
     return fetch(url, { ...options, headers });
   };
 
-  // Fetch data on mount
-  useEffect(() => {
-    fetchMeetings();
-  }, []);
-
-  // Apply theme to document root
-  useEffect(() => {
-    if (typeof document !== "undefined") {
-      document.documentElement.setAttribute("data-theme", theme);
-    }
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("theme", theme);
-    }
-  }, [theme]);
-
-  // Handle Deep Links
-  useEffect(() => {
-    const path = window.location.pathname;
-    const match = path.match(/\/meeting\/([a-fA-F0-9-]+)/);
-    if (match && match[1]) {
-      const meetingId = match[1];
-      // We might need to fetch the meeting if it's not in the list yet
-      // For now, let's at least try to set the ID
-      setSelectedMeeting({ id: meetingId } as any);
-      setCurrentView("meeting");
-    }
-  }, []);
+  useEffect(() => { fetchMeetings(); fetchDashboardStats(); }, []);
 
   useEffect(() => {
-    if (selectedMeeting?.id) {
-      if (selectedMeeting.status === "scheduled") {
-        fetchAgenda(selectedMeeting.id);
-      } else {
-        fetchAgenda(selectedMeeting.id);
+    const params = new URLSearchParams(window.location.search);
+    const meetingId = params.get('meeting');
+    if (meetingId && meetings.length > 0) {
+      const meeting = meetings.find(m => (m.id || m._id)?.toString() === meetingId.toString());
+      if (meeting) {
+        setSelectedMeeting(meeting);
+        setCurrentView('meeting');
       }
     }
-  }, [selectedMeeting?.id]);
+  }, [meetings]);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") document.documentElement.setAttribute("data-theme", theme);
+    if (typeof window !== "undefined") window.localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const labels: Record<string, string> = {
+      dashboard: "Dashboard",
+      meeting: selectedMeeting?.title || "Live Meeting",
+      schedule: "Schedule",
+      archive: "Archive",
+      analytics: "Analytics",
+      settings: "Settings",
+      profile: "Profile",
+    };
+    const label = labels[currentView] ?? currentView;
+    document.title = `${label} — Concord`;
+  }, [currentView, selectedMeeting]);
+
+  useEffect(() => {
+    if (selectedMeeting) {
+      fetchAgenda(selectedMeeting.id);
+      fetchTranscript(selectedMeeting.id);
+      fetchActionItems(selectedMeeting.id);
+      fetchPins(selectedMeeting.id);
+    }
+  }, [selectedMeeting]);
 
   useEffect(() => {
     if (!socket || !selectedMeeting) return;
-
     const meetingId = selectedMeeting.id;
-    socket.emit('join_meeting', meetingId);
+    socket.emit('join_meeting', { meetingId });
+
+    const handleTranscriptUpdate = (segment: any) => {
+      if (segment.meetingId === meetingId) setTranscripts(prev => [...prev, segment]);
+    };
+    const handleTranscriptReplaced = ({ meetingId: replacedId }: { meetingId: string }) => {
+      if (replacedId === meetingId) fetchTranscript(meetingId);
+    };
+    const handleAgendaSync = ({ meetingId: mid, items }: { meetingId: string; items: any[] }) => {
+      if (mid === meetingId) setAgendaItems(items);
+    };
+    const handleMeetingEnded = ({ meetingId: mid }: { meetingId: string }) => {
+      if (mid === meetingId) {
+        setMeetings(prev => prev.map(m => (m.id === mid ? { ...m, status: 'completed' } : m)));
+        setSelectedMeeting((prev: any) => prev && prev.id === mid ? { ...prev, status: 'completed' } : prev);
+      }
+    };
+
+    socket.on('transcript_update', handleTranscriptUpdate);
+    socket.on('transcript_replaced', handleTranscriptReplaced);
+    socket.on('agenda_sync', handleAgendaSync);
+    socket.on('meeting_ended', handleMeetingEnded);
 
     return () => {
-      socket.emit('leave_meeting', meetingId);
+      socket.emit('leave_meeting', { meetingId });
+      socket.off('transcript_update', handleTranscriptUpdate);
+      socket.off('transcript_replaced', handleTranscriptReplaced);
+      socket.off('agenda_sync', handleAgendaSync);
+      socket.off('meeting_ended', handleMeetingEnded);
     };
   }, [socket, selectedMeeting]);
 
@@ -167,201 +183,219 @@ const DashboardApp: FC<DashboardAppProps> = () => {
       if (res.ok) {
         const data = await res.json();
         setMeetings(data);
-        if (data.length > 0) {
-          setSelectedMeeting(prev => prev && prev.id ? prev : data[0]);
-        }
+        if (data.length > 0) setSelectedMeeting(data[0]);
       }
-    } catch (err) {
-      console.error("Failed to fetch meetings:", err);
-    }
+    } catch (err) { console.error("Failed to fetch meetings:", err); }
   };
 
   const fetchAgenda = async (meetingId: string) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/agenda/${meetingId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAgendaItems(data?.items || []);
-      }
-    } catch (err) {
-      console.error("Failed to fetch agenda:", err);
-    }
+      if (res.ok) setAgendaItems(await res.json());
+    } catch (err) { console.error("Failed to fetch agenda:", err); }
   };
 
-
-  const handleCreateMeeting = async (meetingData: MeetingFormData & { agenda?: Array<{ title: string; duration: number }> }) => {
+  const fetchTranscript = async (meetingId: string) => {
     try {
-      const { agenda, ...baseMeetingData } = meetingData;
-      const res = await fetchWithAuth(`${API_BASE}/meetings`, {
-        method: "POST",
-        body: JSON.stringify(baseMeetingData),
-      });
+      const res = await fetchWithAuth(`${API_BASE}/transcript/${meetingId}`);
+      if (res.ok) setTranscripts(await res.json());
+    } catch (err) { console.error("Failed to fetch transcript:", err); }
+  };
+
+  const fetchActionItems = async (meetingId: string) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/action-items/${meetingId}`);
+      if (res.ok) setActionItems(await res.json());
+    } catch (err) { console.error("Failed to fetch action items:", err); }
+  };
+
+  const fetchDashboardStats = async () => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/dashboard/stats`);
+      if (res.ok) setDashboardStats(await res.json());
+    } catch (err) { console.error("Failed to fetch dashboard stats:", err); }
+  };
+
+  const fetchPins = async (meetingId: string) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/pins/${meetingId}`);
+      if (res.ok) setPins(await res.json());
+    } catch (err) { console.error("Failed to fetch pins:", err); }
+  };
+
+  const handleCreateMeeting = async (meetingData: any) => {
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/meetings`, { method: "POST", body: JSON.stringify(meetingData) });
       if (res.ok) {
         const newMeeting = await res.json();
-        
-        // Save initial agenda items if provided
-        if (agenda && agenda.length > 0) {
-          const formattedItems = agenda.map((item, index) => ({
-            id: `ag-${Date.now()}-${index}`,
-            title: item.title,
-            duration: item.duration,
-            status: 'pending' as const
-          }));
-          
-          await fetchWithAuth(`${API_BASE}/agenda/${newMeeting.id || newMeeting._id}`, {
-            method: "POST",
-            body: JSON.stringify({
-              items: formattedItems,
-              totalDuration: formattedItems.reduce((acc, curr) => acc + curr.duration, 0)
-            })
-          });
-        }
-        
-        setMeetings((prev) => [newMeeting, ...prev]);
+        setMeetings(prev => [newMeeting, ...prev]);
         setSelectedMeeting(newMeeting);
         return newMeeting;
       }
-    } catch (err) {
-      console.error("Failed to create meeting:", err);
-    }
+    } catch (err) { console.error("Failed to create meeting:", err); }
     return null;
   };
+
+  const handlePinResource = (timestamp: string) => {
+    setPinTimestamp(timestamp);
+    setShowPinModal(true);
+  };
+
+  const handleMeetingEnded = () => {
+    if (selectedMeeting) {
+      setMeetings(prev => prev.map(m => (m.id === selectedMeeting.id ? { ...m, status: 'completed' } : m)));
+      setSelectedMeeting(prev => prev ? { ...prev, status: 'completed' } : prev);
+    }
+  };
+
+  const isHost = selectedMeeting?.hostId === user?._id;
 
   const renderContent = () => {
     switch (currentView) {
       case "dashboard":
         return (
-          <ProductivityDashboard
-            userName={user?.name}
-            stats={{
-              totalMeetings: meetings.length || 12,
-              totalHours: 18,
-              punctualityRate: 92,
-              tasksCompleted: 7,
-              tasksTotal: 8,
-              streak: 7,
-              weeklyHeatmap: [
-                { day: 'Mon', hours: 2 }, { day: 'Tue', hours: 3 },
-                { day: 'Wed', hours: 1 }, { day: 'Thu', hours: 4 },
-                { day: 'Fri', hours: 2 }, { day: 'Sat', hours: 0 },
-                { day: 'Sun', hours: 1 },
-              ],
-              badges: [
-                { icon: '🏆', name: 'Punctual Pro', description: 'On time 10 meetings in a row' },
-                { icon: '🎯', name: 'Task Master', description: 'Completed 50 action items' },
-                { icon: '🔥', name: 'Hot Streak', description: '7-day meeting streak' },
-                { icon: '🌟', name: 'Top Contributor', description: 'Most engagement this month' },
-              ],
-              sentimentProfile: { positive: 72, neutral: 20, negative: 8 },
-              monthlyAttendance: [
-                { week: 'W1', attended: 4, total: 5 },
-                { week: 'W2', attended: 5, total: 5 },
-                { week: 'W3', attended: 3, total: 4 },
-                { week: 'W4', attended: 4, total: 5 },
-              ],
-              speakingTime: 22,
-              avgMeetingDuration: 54,
-            }}
-          />
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <ProductivityDashboard stats={dashboardStats} userName={user?.name} />
+          </div>
         );
 
       case "meeting":
+        if (!selectedMeeting) {
+          return (
+            <div style={{ flex: 1, overflow: "auto", padding: "1.5rem" }}>
+              <h2 style={{ fontSize: "1.375rem", fontWeight: 700, marginBottom: "1rem" }}>Live Meeting</h2>
+              <p style={{ color: "var(--text-muted)", marginBottom: "1rem" }}>
+                Select a meeting below to join the call and see agenda, transcript, and notes.
+              </p>
+              <div className="meeting-list">
+                {meetings.map(meeting => (
+                  <div key={meeting.id} className="meeting-card glass-card" onClick={() => setSelectedMeeting(meeting)}>
+                    {meeting.status === "pending_poll" && meeting.pollId && (
+                      <button className="btn btn-sm btn-primary" style={{ position: 'absolute', top: 'var(--lk-size-md)', right: 'var(--lk-size-md)' }} onClick={(e) => { e.stopPropagation(); setPollMeetingId(meeting.id); }}>Vote</button>
+                    )}
+                    <div className="meeting-card-title">{meeting.title}</div>
+                    <div className="meeting-card-meta">
+                      <span className={`chip ${meeting.modality === "Online" ? "chip-blue" : meeting.modality === "Hybrid" ? "chip-purple" : "chip-emerald"}`}>{meeting.modality}</span>
+					  <span className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}>
+                        {meeting.status === "pending_poll" ? "Poll Open" : meeting.status}
+                      </span>
+                      {meeting.date && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.date)}</span>}
+                      {meeting.time && <span><Icon icon={Clock01Icon} size={14} /> {meeting.time}</span>}
+                      <span><Icon icon={UserIcon} size={14} /> {meeting.host}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
         return (
-          <div
-            ref={meetingLayoutRef}
-            className="meeting-layout-flex"
-            style={{ 
-              display: 'flex', 
-              height: '100%', 
-              width: '100%', 
-              gap: '0.375rem', 
-              padding: '0.375rem', 
-              overflow: 'hidden',
-              background: 'var(--bg-primary)'
-            }}
-          >
+          <div ref={meetingLayoutRef} className={`meeting-layout ${!agendaPanelOpen ? 'agenda-hidden' : ''} ${!rightPanelOpen ? 'right-hidden' : ''}`}>
             {agendaPanelOpen && (
-              <div className="meeting-side-panel meeting-side-panel-left open" style={{ width: '18.75rem', flexShrink: 0, height: '100%' }}>
+              <div className="meeting-side-panel meeting-side-panel-left open">
                 <AgendaPanel
                   agendaItems={agendaItems}
-                  onItemChange={async (newItems) => {
-                    setAgendaItems(newItems);
-                    if (selectedMeeting?.id) {
-                       await fetchWithAuth(`${API_BASE}/agenda/${selectedMeeting.id}`, {
-                         method: "POST",
-                         body: JSON.stringify({
-                           items: newItems,
-                           totalDuration: newItems.reduce((acc, curr) => acc + curr.duration, 0)
-                         })
-                       });
-                    }
-                  }}
+                  meetingId={selectedMeeting.id}
+                  isHost={isHost}
+                  onItemChange={setAgendaItems}
+                  onClose={toggleAgendaPanel}
+                  fetchWithAuth={fetchWithAuth}
+                  addAgendaItemTrigger={addAgendaItemTrigger}
+                  onAddTriggered={() => setAddAgendaItemTrigger(0)}
+                />
+                <RubricSidebar
+                  meetingId={selectedMeeting.id}
+                  participants={selectedMeeting.participants || []}
+                  fetchWithAuth={fetchWithAuth}
                 />
               </div>
             )}
-            <div className="video-area-wrapper" style={{ flex: 1, minWidth: 0, height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <VideoArea
-                meetingId={selectedMeeting?.id}
-                meetingTitle={selectedMeeting?.title || "No Meeting Selected"}
-                participants={selectedMeeting?.participants?.map((id: string) => ({ _id: id, name: "Participant" })) || []}
-                modality={selectedMeeting?.modality}
-                currentUser={user}
-                fullscreenRef={meetingLayoutRef}
-                agendaPanelOpen={agendaPanelOpen}
-                rightPanelOpen={false}
-                onToggleAgendaPanel={toggleAgendaPanel}
-                onToggleRightPanel={() => {}}
-              />
-            </div>
+            <VideoArea
+              meetingId={selectedMeeting?.id}
+              meetingTitle={selectedMeeting?.title || "Select a Meeting"}
+              participants={selectedMeeting?.participants || []}
+              modality={selectedMeeting?.modality}
+              currentUser={user}
+              fullscreenRef={meetingLayoutRef}
+              agendaPanelOpen={agendaPanelOpen}
+              rightPanelOpen={rightPanelOpen}
+              onToggleAgendaPanel={toggleAgendaPanel}
+              onToggleRightPanel={toggleRightPanel}
+              onMeetingEnded={handleMeetingEnded}
+              onTriggerAddActionItem={triggerAddActionItem}
+              onTriggerAddAgendaItem={triggerAddAgendaItem}
+            />
+            {rightPanelOpen && (
+              <div className="meeting-side-panel meeting-side-panel-right open">
+                <div className="right-panel-content">
+                  <TranscriptFeed
+                    transcripts={transcripts}
+                    onClosePanel={toggleRightPanel}
+                    onPinResource={handlePinResource}
+                    pins={pins}
+                  />
+                  <ActionItems
+                    items={actionItems}
+                    meetingId={selectedMeeting.id}
+                    fetchWithAuth={fetchWithAuth}
+                    onRefresh={() => fetchActionItems(selectedMeeting.id)}
+                    addActionItemTrigger={addActionItemTrigger}
+                    onAddTriggered={() => setAddActionItemTrigger(0)}
+                  />
+                  <LiveOutcome agendaItems={agendaItems} actionItems={actionItems} transcripts={transcripts} />
+                </div>
+              </div>
+            )}
           </div>
         );
 
       case "schedule":
         return (
-          <div style={{ flex: 1, overflow: "auto", padding: "1.5rem" }}>
-            <h2
-              style={{
-                fontSize: "1.375rem",
-                fontWeight: 700,
-                marginBottom: "1rem",
-              }}
-            >
-              Scheduled Meetings
-            </h2>
+          <div style={{ flex: 1, overflow: "auto" }}>
+            <div className="page-header">
+				<h2 style={{ fontSize: 'var(--font-size-title3)', fontWeight: 600, marginBottom: 'var(--lk-size-2xs)', letterSpacing: '-0.022em' }}>Scheduled Meetings</h2>
+			</div>
             <div className="meeting-list">
-              {meetings.map((meeting) => (
+              {meetings.map(meeting => (
                 <div
                   key={meeting.id}
                   className={`meeting-card glass-card ${selectedMeeting?.id === meeting.id ? "selected" : ""}`}
-                  onClick={() => {
-                    setSelectedMeeting(meeting);
-                    setCurrentView("meeting");
-                  }}
-                  style={
-                    selectedMeeting?.id === meeting.id
-                      ? { borderColor: "var(--primary-border)" }
-                      : {}
-                  }
+                  onClick={() => { setSelectedMeeting(meeting); setCurrentView("meeting"); }}
+                  style={selectedMeeting?.id === meeting.id ? { borderColor: "var(--primary-border)" } : {}}
                 >
+                  {meeting.status === "pending_poll" && meeting.pollId && (
+                    <button className="btn btn-sm btn-primary" style={{ position: 'absolute', top: 'var(--lk-size-md)', right: 'var(--lk-size-md)' }} onClick={(e) => { e.stopPropagation(); setPollMeetingId(meeting.id); }}>Vote</button>
+                  )}
                   <div className="meeting-card-title">{meeting.title}</div>
                   <div className="meeting-card-meta">
-                    <span
-                      className={`chip ${meeting.modality === "Online" ? "chip-blue" : meeting.modality === "Hybrid" ? "chip-violet" : "chip-emerald"}`}
-                    >
-                      {meeting.modality}
-                    </span>
+                    <span className={`chip ${meeting.modality === "Online" ? "chip-blue" : meeting.modality === "Hybrid" ? "chip-purple" : "chip-emerald"}`}>{meeting.modality}</span>
+					<span className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}>
+                        {meeting.status === "pending_poll" ? "Poll Open" : meeting.status}
+                      </span>
                     {meeting.date && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.date)}</span>}
                     {meeting.time && <span><Icon icon={Clock01Icon} size={14} /> {meeting.time}</span>}
                     <span><Icon icon={UserIcon} size={14} /> {meeting.host}</span>
-                    <span
-                      className={`chip ${meeting.status === "completed" ? "chip-emerald" : (meeting.status as string) === "pending_poll" ? "chip-blue" : "chip-amber"}`}
-                    >
-                      {meeting.status}
-                    </span>
                   </div>
                 </div>
               ))}
             </div>
+          </div>
+        );
+
+      case "archive":
+        return <ArchiveView fetchWithAuth={fetchWithAuth} />;
+
+      case "analytics":
+        return (
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <ProductivityDashboard stats={dashboardStats} userName={user?.name} />
+          </div>
+        );
+
+      case "profile":
+        return (
+          <div style={{ flex: 1, overflow: "auto" }}>
+            <ProfileSettings />
           </div>
         );
 
@@ -377,70 +411,67 @@ const DashboardApp: FC<DashboardAppProps> = () => {
   return (
     <div className="app-container">
       <TopBar
-        userName={user?.name || "User"}
+        streak={dashboardStats?.streak || 0}
+        userName={user?.name || dashboardStats?.user || "User"}
         onNewMeeting={() => setShowCreateMeeting(true)}
         theme={theme}
-        onToggleTheme={() =>
-          setTheme((prev) => (prev === "dark" ? "light" : "dark"))
-        }
+        onToggleTheme={() => setTheme(prev => prev === "dark" ? "light" : "dark")}
         sidebarCollapsed={sidebarCollapsed}
         onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
         onLogout={logout}
+        onOpenPoll={(meetingId) => setPollMeetingId(meetingId)}
+        searchInputRef={searchInputRef}
+        onViewChange={setCurrentView}
+        onSearchResultSelect={(meeting) => { setSelectedMeeting(meeting); setCurrentView('meeting'); }}
       />
 
       <div className="main-area">
-        <Sidebar
-          currentView={currentView}
-          onViewChange={setCurrentView}
-          collapsed={sidebarCollapsed}
-        />
-
+        <Sidebar currentView={currentView} onViewChange={setCurrentView} collapsed={sidebarCollapsed} onLogout={logout} />
         <div className="content-area">{renderContent()}</div>
       </div>
 
       {showCreateMeeting && (
-        <MeetingCreation
-          onClose={() => setShowCreateMeeting(false)}
-          onSubmit={handleCreateMeeting}
+        <MeetingCreation onClose={() => setShowCreateMeeting(false)} onSubmit={handleCreateMeeting} />
+      )}
+
+      {pollMeetingId && (
+        <PollVoting meetingId={pollMeetingId} onClose={() => setPollMeetingId(null)} />
+      )}
+
+      {showPinModal && selectedMeeting && (
+        <PinModal
+          meetingId={selectedMeeting.id}
+          transcriptTimestamp={pinTimestamp}
+          onClose={() => { setShowPinModal(false); setPinTimestamp(null); }}
+          fetchWithAuth={fetchWithAuth}
+          onPinCreated={() => fetchPins(selectedMeeting.id)}
         />
       )}
     </div>
   );
-};
+}
 
-// Main App component that maps auth states to the correct UI
-interface AppProps {}
-
-const App: FC<AppProps> = () => {
+export default function App() {
   const { user, loading } = useAuth();
-  const [authView, setAuthView] = useState<"login" | "signup">("login");
+  const [authView, setAuthView] = useState("login");
+
+  useEffect(() => {
+    if (loading) document.title = "Concord";
+    else if (!user) document.title = authView === "login" ? "Login — Concord" : "Signup — Concord";
+  }, [loading, user, authView]);
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-          background: "var(--bg-primary)",
-        }}
-      >
-        <div style={{ color: "var(--primary)", fontSize: "1.5rem" }}>
-          ⌘ MCMS Loading...
-        </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg-primary)" }}>
+        <div style={{ color: "var(--primary)", fontSize: "1.5rem" }}>MCMS Loading...</div>
       </div>
     );
   }
 
-  // If not authenticated, show login or signup pages
   if (!user) {
-    if (authView === "login") return <Login onNavigate={(view) => setAuthView(view as "login" | "signup")} />;
-    if (authView === "signup") return <Signup onNavigate={(view) => setAuthView(view as "login" | "signup")} />;
+    if (authView === "login") return <Login onNavigate={setAuthView} />;
+    if (authView === "signup") return <Signup onNavigate={setAuthView} />;
   }
 
-  // If authenticated, show the main dashboard
   return <DashboardApp />;
-};
-
-export default App;
+}

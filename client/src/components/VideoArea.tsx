@@ -12,6 +12,7 @@ import {
 import ShortcutTooltip from "./ShortcutTooltip";
 import Kbd from "./Kbd";
 import useWebRTC from "../hooks/useWebRTC";
+import useTranscriptionCapture from "../hooks/useTranscriptionCapture";
 import { useSocket } from "../context/SocketContext";
 
 const SERVER_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/api$/, "");
@@ -22,6 +23,8 @@ interface VideoTileProps {
   profileImage?: string | null;
   muted: boolean;
   isSelf: boolean;
+  /** When true, skip horizontal mirror (screen share must stay left–right correct). */
+  isScreenShare?: boolean;
   speaking?: boolean;
 }
 
@@ -41,7 +44,7 @@ interface VideoAreaProps {
   onTriggerAddAgendaItem?: () => void;
 }
 
-function VideoTile({ stream, name, profileImage, muted, isSelf, speaking }: VideoTileProps) {
+function VideoTile({ stream, name, profileImage, muted, isSelf, isScreenShare, speaking }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hasVideo, setHasVideo] = useState<boolean>(false);
 
@@ -90,7 +93,7 @@ function VideoTile({ stream, name, profileImage, muted, isSelf, speaking }: Vide
         playsInline
         muted={muted}
         className="video-tile-video"
-        style={isSelf
+        style={isSelf && !isScreenShare
           ? { transform: "scaleX(-1)", display: hasVideo ? undefined : "none" }
           : { display: hasVideo ? undefined : "none" }
         }
@@ -132,8 +135,7 @@ export default function VideoArea({
   onTriggerAddActionItem,
   onTriggerAddAgendaItem,
 }: VideoAreaProps) {
-  const { socket } = useSocket();
-  const connected = socket ? socket.connected : false;
+  const { socket, connected } = useSocket();
   const {
     localStream,
     peers,
@@ -146,7 +148,9 @@ export default function VideoArea({
     toggleAudio,
     toggleVideo,
     toggleScreenShare,
-  } = useWebRTC(socket, meetingId ?? null, currentUser || null);
+  } = useWebRTC(socket, meetingId, currentUser);
+
+  useTranscriptionCapture(socket, meetingId, localStream);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
@@ -180,6 +184,18 @@ export default function VideoArea({
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
+
+  useEffect(() => {
+    if (!socket || !meetingId) return;
+    const handleMeetingEnded = ({ meetingId: mid }: { meetingId: string }) => {
+      if (mid === meetingId && hasJoined) {
+        leaveRoom();
+        setHasJoined(false);
+      }
+    };
+    socket.on('meeting_ended', handleMeetingEnded);
+    return () => { socket.off('meeting_ended', handleMeetingEnded); };
+  }, [socket, meetingId, hasJoined, leaveRoom]);
 
   useEffect(() => {
     setHasJoined(false);
@@ -291,6 +307,7 @@ export default function VideoArea({
                 profileImage={currentUser?.profileImage}
                 muted={true}
                 isSelf={true}
+                isScreenShare={!!screenStream}
               />
               {peers.map((peer) => (
                 <VideoTile
@@ -323,6 +340,234 @@ export default function VideoArea({
         onMeetingEnded={onMeetingEnded}
       />
 
+      <style>{`
+        .video-area {
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          background: var(--bg-primary);
+          border: 0.0625rem solid var(--border);
+          border-radius: var(--radius-md);
+          overflow: hidden;
+        }
+        .video-panel-toggle {
+          flex-shrink: 0;
+          width: 2rem;
+          height: 2rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: var(--bg-card);
+          border: 0.0625rem solid var(--border);
+          border-radius: var(--radius-sm);
+          color: var(--text-muted);
+          cursor: pointer;
+          transition: background 0.2s, color 0.2s, border-color 0.2s;
+          padding: 0;
+        }
+        .video-panel-toggle:hover {
+          background: var(--bg-hover);
+          color: var(--primary);
+          border-color: var(--border-hover);
+        }
+        .video-header {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.75rem 1.25rem;
+          border-bottom: 0.0625rem solid var(--border);
+        }
+        .video-meeting-title {
+          font-size: 1rem;
+          font-weight: 600;
+          margin-bottom: 0.125rem;
+        }
+        .video-meeting-meta {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
+          font-size: 0.75rem;
+          color: var(--text-muted);
+        }
+        .video-container {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.75rem;
+          overflow: hidden;
+        }
+        .video-placeholder {
+          width: 100%;
+          height: 100%;
+          border-radius: var(--radius-lg);
+          overflow: hidden;
+        }
+        .video-offline-message {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          color: var(--text-muted);
+        }
+
+        /* Pre-join screen */
+        .video-prejoin {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          background: var(--bg-elevated);
+          border-radius: var(--radius-lg);
+          border: 0.0625rem solid var(--border);
+        }
+        .prejoin-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 1rem;
+          padding: 3rem 4rem;
+        }
+        .prejoin-avatar {
+          width: 5rem;
+          height: 5rem;
+          border-radius: 50%;
+          background: var(--primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 2rem;
+          font-weight: 700;
+          color: white;
+          overflow: hidden;
+        }
+        .prejoin-avatar-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .prejoin-title {
+          font-size: 1.125rem;
+          font-weight: 600;
+          text-align: center;
+        }
+        .prejoin-subtitle {
+          font-size: 0.8125rem;
+          color: var(--text-muted);
+        }
+        .prejoin-btn {
+          margin-top: 0.5rem;
+          padding: 0.625rem 2rem;
+          font-size: 0.875rem;
+        }
+        .prejoin-btn .prejoin-enter {
+          margin-left: 0.375rem;
+        }
+        .prejoin-btn .prejoin-enter .kbd {
+          font-size: 0.5625rem;
+          min-width: 1rem;
+          height: 1rem;
+          padding: 0 0.25rem;
+          background: color-mix(in srgb, var(--primary) 25%, rgba(255,255,255,0.25));
+          border: 0.0625rem solid color-mix(in srgb, var(--primary) 70%, rgba(255,255,255,0.5));
+          color: rgba(255,255,255,0.95);
+          box-shadow: 0 0.0625rem 0 rgba(0,0,0,0.15);
+        }
+
+        /* Video grid */
+        .video-grid {
+          display: grid;
+          gap: 0.375rem;
+          width: 100%;
+          height: 100%;
+        }
+        .grid-1 { grid-template-columns: 1fr; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+        .grid-4 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(2, 1fr); }
+        .grid-6 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); }
+        .grid-many { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+
+        .video-tile {
+          position: relative;
+          background: var(--bg-elevated);
+          border: 0.0625rem solid var(--border);
+          border-radius: var(--radius-md);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+          animation: slideUp 0.4s ease both;
+          transition: border-color 0.3s;
+        }
+        .video-tile:hover {
+          border-color: var(--border-hover);
+        }
+        .video-tile.speaking {
+          border-color: var(--primary);
+          box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent);
+        }
+        .video-tile-video {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: inherit;
+        }
+        .video-tile-avatar {
+          width: 3.5rem;
+          height: 3.5rem;
+          border-radius: 50%;
+          background: var(--primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.375rem;
+          font-weight: 700;
+          color: white;
+          overflow: hidden;
+        }
+        .video-tile-avatar-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .video-tile-name {
+          position: absolute;
+          bottom: 0.5rem;
+          left: 0.5rem;
+          padding: 0.1875rem 0.5rem;
+          background: rgba(0, 0, 0, 0.6);
+          border-radius: 0.25rem;
+          font-size: 0.75rem;
+          font-weight: 500;
+          color: #fff;
+          backdrop-filter: blur(4px);
+        }
+        .self-badge {
+          position: absolute;
+          top: 0.5rem;
+          right: 0.5rem;
+          padding: 0.125rem 0.375rem;
+          background: var(--primary);
+          border-radius: 6.25rem;
+          font-size: 0.5625rem;
+          font-weight: 700;
+          color: white;
+          letter-spacing: 0.03125rem;
+        }
+        .host-badge {
+          position: absolute;
+          top: 0.625rem;
+          right: 0.625rem;
+          padding: 0.1875rem 0.5rem;
+          background: var(--primary);
+          border-radius: 6.25rem;
+          font-size: 0.625rem;
+          font-weight: 700;
+          color: white;
+          letter-spacing: 0.03125rem;
+        }
+      `}</style>
     </div>
   );
 }

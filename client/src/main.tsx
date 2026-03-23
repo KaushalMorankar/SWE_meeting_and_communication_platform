@@ -5,12 +5,7 @@ import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { SocketProvider } from './context/SocketContext'
 
-const rootElement = document.getElementById('root')
-if (!rootElement) {
-  throw new Error('Failed to find root element')
-}
-
-createRoot(rootElement).render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <SocketProvider>

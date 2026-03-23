@@ -1,67 +1,59 @@
-import { createContext, useContext, useEffect, useState, ReactNode, FC } from 'react';
-import io, { Socket } from 'socket.io-client';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
-interface SocketContextType {
-  socket: Socket | null;
-  isConnected: boolean;
+export interface SocketContextValue {
+    socket: Socket | null;
+    connected: boolean;
 }
 
-const SocketContext = createContext<SocketContextType | undefined>(undefined);
+const SocketContext = createContext<SocketContextValue | null>(null);
+
+export const useSocket = () => useContext(SocketContext);
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL
+    || import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '')
+    || 'http://localhost:5001';
 
 interface SocketProviderProps {
-  children: ReactNode;
+    children: ReactNode;
 }
 
-export const SocketProvider: FC<SocketProviderProps> = ({ children }) => {
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const { user } = useAuth();
+export const SocketProvider = ({ children }: SocketProviderProps) => {
+    const { user } = useAuth();
+    const socketRef = useRef<Socket | null>(null);
+    const [connected, setConnected] = useState(false);
 
-  useEffect(() => {
-    if (!user?.token) {
-      setSocket(null);
-      setIsConnected(false);
-      return;
-    }
+    useEffect(() => {
+        if (!user?.token) {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+                setConnected(false);
+            }
+            return;
+        }
 
-    const serverUrl = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
-    const newSocket = io(serverUrl, {
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-      auth: {
-        token: user.token,
-      },
-    });
+        const socket = io(SOCKET_URL, {
+            auth: { token: user.token },
+            transports: ['websocket', 'polling'],
+        });
 
-    newSocket.on('connect', () => {
-      setIsConnected(true);
-    });
+        socket.on('connect', () => setConnected(true));
+        socket.on('disconnect', () => setConnected(false));
 
-    newSocket.on('disconnect', () => {
-      setIsConnected(false);
-    });
+        socketRef.current = socket;
 
-    setSocket(newSocket);
+        return () => {
+            socket.disconnect();
+            socketRef.current = null;
+            setConnected(false);
+        };
+    }, [user?.token]);
 
-    return () => {
-      newSocket.disconnect();
-    };
-  }, [user?.token]);
-
-  return (
-    <SocketContext.Provider value={{ socket, isConnected }}>
-      {children}
-    </SocketContext.Provider>
-  );
-};
-
-export const useSocket = (): SocketContextType => {
-  const context = useContext(SocketContext);
-  if (!context) {
-    throw new Error('useSocket must be used within a SocketProvider');
-  }
-  return context;
+    return (
+        <SocketContext.Provider value={{ socket: socketRef.current, connected }}>
+            {children}
+        </SocketContext.Provider>
+    );
 };

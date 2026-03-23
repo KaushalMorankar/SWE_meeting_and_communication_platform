@@ -1,26 +1,9 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose from 'mongoose';
 
-export interface IMeeting extends Document {
-  title: string;
-  modality: string;
-  date?: string;
-  time?: string;
-  confirmedDate?: string;
-  confirmedTime?: string;
-  location?: string;
-  host?: string;
-  hostId?: mongoose.Types.ObjectId;
-  participants: mongoose.Types.ObjectId[];
-  pollId?: mongoose.Types.ObjectId;
-  status: 'pending_poll' | 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
-  jitsiUrl?: string;
-  jitsiRoomName?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-const meetingSchema = new Schema({
+const meetingSchema = new mongoose.Schema({
     title: { type: String, required: true },
+    description: { type: String },
+    durationMinutes: { type: Number },
     modality: { type: String, default: 'Online' },
     date: { type: String },
     time: { type: String },
@@ -38,4 +21,4 @@ const meetingSchema = new Schema({
     timestamps: true
 });
 
-export default mongoose.model<IMeeting>('Meeting', meetingSchema);
+export = mongoose.model('Meeting', meetingSchema);

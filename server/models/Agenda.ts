@@ -1,43 +1,23 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose from 'mongoose';
 
-export interface IAgendaItem {
-  id: string;
-  title: string;
-  description?: string;
-  duration: number;
-  status: 'pending' | 'in-progress' | 'completed' | 'skipped';
-  startTime?: Date;
-  endTime?: Date;
-  speaker?: string;
-  notes?: string;
-}
-
-export interface IAgenda extends Document {
-  meetingId: mongoose.Types.ObjectId;
-  items: IAgendaItem[];
-  totalDuration: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-const agendaItemSchema = new Schema({
-  id: { type: String, required: true },
-  title: { type: String, required: true },
-  description: { type: String },
-  duration: { type: Number, required: true },
-  status: { type: String, enum: ['pending', 'in-progress', 'completed', 'skipped'], default: 'pending' },
-  startTime: { type: Date },
-  endTime: { type: Date },
-  speaker: { type: String },
-  notes: { type: String, default: '' }
+const agendaItemSchema = new mongoose.Schema({
+    id: { type: String, required: true },
+    title: { type: String, required: true },
+    duration: { type: Number, default: 10 },
+    status: { type: String, enum: ['pending', 'active', 'paused', 'completed'], default: 'pending' },
+    notes: { type: String, default: '' },
+    order: { type: Number, default: 0 },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
 }, { _id: false });
 
-const agendaSchema = new Schema({
-  meetingId: { type: Schema.Types.ObjectId, ref: 'Meeting', required: true, unique: true },
-  items: [agendaItemSchema],
-  totalDuration: { type: Number, default: 0 },
+const agendaSchema = new mongoose.Schema({
+    meetingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Meeting', required: true, unique: true },
+    items: [agendaItemSchema],
+    activeItemId: { type: String, default: null },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, {
-  timestamps: true
+    timestamps: true,
 });
 
-export default mongoose.model<IAgenda>('Agenda', agendaSchema);
+export = mongoose.model('Agenda', agendaSchema);

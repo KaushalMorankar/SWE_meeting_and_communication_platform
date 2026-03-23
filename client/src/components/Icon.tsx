@@ -1,17 +1,13 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { CSSProperties } from 'react';
 
 interface IconProps {
   icon: any;
   size?: number;
   className?: string;
-  style?: CSSProperties;
-  [key: string]: any;
+  style?: React.CSSProperties;
+  [key: string]: unknown;
 }
 
-/**
- * Wrapper around HugeiconsIcon for consistent usage with size, className, and style (e.g. color).
- */
 export default function Icon({ icon, size = 24, className, style, ...rest }: IconProps) {
   if (icon == null || !Array.isArray(icon)) {
     return null;

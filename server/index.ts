@@ -1,640 +1,509 @@
-import express, { Request, Response, Application } from 'express';
+import express from 'express';
 import http from 'http';
-import { Server, Socket } from 'socket.io';
+import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import mongoose from 'mongoose';
-import { protect } from './middleware/auth';
-import UserModel from './models/User';
-import MeetingModel from './models/Meeting';
-import AgendaModel from './models/Agenda';
+import { Server } from 'socket.io';
+import nodemailer from 'nodemailer';
+import cron from 'node-cron';
 
 dotenv.config();
 
-// Types
-interface InMemoryUser {
-	_id: string;
-	name: string;
-	email: string;
-	password: string;
+// ── Optional MongoDB connection ──────────────────────────────
+let usingMongoFlag = false;
+let User: any = null, Meeting: any = null, Poll: any = null, Notification: any = null, RSVP: any = null;
+let Transcript: any = null, Agenda: any = null, ActionItem: any = null, Attendance: any = null;
+
+try {
+    const mongoose = require('mongoose');
+    const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/mcms_db';
+    const builtUri = (process.env.MONGO_PASSWORD && mongoUri.includes('mongodb+srv://'))
+        ? mongoUri.replace(/^mongodb\+srv:\/\/([^:]+):[^@]+@/, (_: string, user: string) =>
+            `mongodb+srv://${user}:${encodeURIComponent(process.env.MONGO_PASSWORD!)}@`)
+        : mongoUri;
+    mongoose.connect(builtUri, { serverSelectionTimeoutMS: 15000 })
+        .then(() => { console.log('MongoDB Connected'); usingMongoFlag = true; })
+        .catch((err: any) => {
+            console.log('MongoDB not available — using in-memory store:', err.message);
+            if (process.env.NODE_ENV === 'production') console.error('Atlas connection failed. Check: IP whitelist, password encoding, MONGO_URI format.');
+        });
+    User = require('./models/User');
+    Meeting = require('./models/Meeting');
+    Poll = require('./models/Poll');
+    Notification = require('./models/Notification');
+    RSVP = require('./models/RSVP');
+    Transcript = require('./models/Transcript');
+    Agenda = require('./models/Agenda');
+    ActionItem = require('./models/ActionItem');
+    Attendance = require('./models/Attendance');
+} catch (e) {
+    console.log('Mongoose not found — using in-memory store');
 }
 
-interface Meeting {
-	id: string;
-	title: string;
-	modality: 'Online' | 'Offline' | 'Hybrid';
-	date: string;
-	time: string;
-	host: string;
-	participants: string[];
-	status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
-	jitsiUrl?: string;
-	jitsiRoomName?: string;
-}
-
-interface Agenda {
-	id: string;
-	title: string;
-	duration: number;
-	status: 'active' | 'pending' | 'completed';
-	notes: string;
-}
-
-
-// Optional MongoDB connection
-let usingMongo = false;
-let User: any = null;
-let Meeting: any = null;
-let Agenda: any = null;
-
-(async () => {
-	try {
-		await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/mcms_db');
-		console.log('✅ MongoDB Connected');
-		usingMongo = true;
-		User = UserModel;
-		Meeting = MeetingModel;
-		Agenda = AgendaModel;
-	} catch (err) {
-		console.log('⚠️  MongoDB not available — using in-memory store:', (err as Error).message);
-	}
-})();
+const usingMongo = () => usingMongoFlag;
 
 // ── In-memory fallback store ─────────────────────────────────
-const inMemoryUsers: InMemoryUser[] = [];
+const inMemoryUsers: any[] = [];
 
-const app: Application = express();
-const httpServer = http.createServer(app);
-const PORT = process.env.PORT || 5000;
+const app = express();
+const server = http.createServer(app);
+const PORT = process.env.PORT || 5001;
 const JWT_SECRET = process.env.JWT_SECRET || 'mcms_super_secret_key';
-
-// ── Socket.io Setup ──────────────────────────────────────────
-export const io = new Server(httpServer, {
-	cors: { origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }
-});
-
-// socket authentication middleware
-io.use((socket: Socket, next) => {
-	// grab the jwt token from the connection handshake
-	const token = socket.handshake.auth?.token;
-	// reject the connection if no token
-	if (!token) return next(new Error('Authentication required'));
-	try { // verify the token
-		const decoded = jwt.verify(token, JWT_SECRET) as any;
-		(socket as any).userId = decoded.id;
-		next();
-	} catch {
-		next(new Error('Invalid token'));
-	}
-});
-
-interface RoomPeerInfo {
-	userId: string | null;
-	name: string;
-	profileImage: string | null;
-}
-
-// outer key = meetingID, inner key = socketID, value = user info
-const meetingRooms = new Map<string, Map<string, RoomPeerInfo>>();
-// track whether transcription is active for a meeting
-const transcriptionSessions = new Map<string, { active: boolean; speakers: Map<string, any> }>();
-
-// when a browser tab successfully connects to the server
-io.on('connection', (socket: Socket) => {
-	const userId = (socket as any).userId;
-
-	// WebRTC Signaling
-
-	// user enters a meeting
-	// (client: VideoArea calls handleJoin --> joinRoom [useWebRTC hook] --> socket.emit('join_room', ...))
-	socket.on('join_room', async ({ meetingId, name, profileImage }: { meetingId: string, name?: string, profileImage?: string }) => {
-		if (!meetingId) return;
-		console.log(`[ROOM] Socket ${socket.id} (user: ${userId}) joining room ${meetingId}`);
-
-		// join the meeting room
-		socket.join(`meeting:${meetingId}`); // any message sent to this room will reach this socket
-
-		// if this is the first person joining this meeting
-		if (!meetingRooms.has(meetingId)) meetingRooms.set(meetingId, new Map());
-		const room = meetingRooms.get(meetingId)!;
-
-		// build a list of everyone already in the room
-		const existingPeers: Array<RoomPeerInfo & { socketId: string }> = [];
-		for (const [sid, info] of room.entries()) {
-			existingPeers.push({ socketId: sid, userId: info.userId, name: info.name, profileImage: info.profileImage });
-		}
-
-		// add the new user to the room
-		room.set(socket.id, { userId: userId, name: name || 'User', profileImage: profileImage || null });
-
-		console.log(`[ROOM] Existing peers for ${meetingId}:`, existingPeers.length);
-		// send the list of existing peers to the client
-		socket.emit('room_peers', { peers: existingPeers });
-		console.log(`[ROOM] Broadcasting peer_joined to room ${meetingId} for socket ${socket.id}`);
-		socket.to(`meeting:${meetingId}`).emit('peer_joined', {
-			socketId: socket.id,
-			userId: userId,
-			name: name || 'User',
-			profileImage: profileImage || null
-		});
-	});
-
-	// passing webRTC messages between peers
-	// to: socketID of the recipient, signal: the actual message (offer, answer, candidate)
-	socket.on('signal', ({ to, signal }: { to: string, signal: any }) => {
-		console.log(`[SIGNAL] ${socket.id} -> ${to}, type: ${signal.type}`);
-
-		// forward the signal to the target socket
-		io.to(to).emit('signal', { from: socket.id, signal });
-	});
-
-	// user leaves a meeting
-	// (client: VideoArea calls handleLeave --> leaveRoom [useWebRTC hook] --> socket.emit('leave_room', ...))
-	socket.on('leave_room', ({ meetingId }: { meetingId: string }) => {
-		if (!meetingId) return;
-		socket.leave(`meeting:${meetingId}`);
-		const room = meetingRooms.get(meetingId);
-		if (room) {
-			room.delete(socket.id);
-			if (room.size === 0) meetingRooms.delete(meetingId);
-		}
-		socket.to(`meeting:${meetingId}`).emit('peer_left', { socketId: socket.id });
-	});
-
-	// Transcription Control
-	socket.on('start_transcription', ({ meetingId }) => {
-		if (!meetingId) return;
-		transcriptionSessions.set(meetingId, { active: true, speakers: new Map() });
-		io.to(`meeting:${meetingId}`).emit('transcription_started', { meetingId });
-	});
-
-	socket.on('stop_transcription', ({ meetingId }) => {
-		if (!meetingId) return;
-		transcriptionSessions.delete(meetingId);
-		io.to(`meeting:${meetingId}`).emit('transcription_stopped', { meetingId });
-	});
-
-	// used for other features (not webRTC)
-	socket.on('join_meeting', (meetingId: string) => {
-		socket.join(`meeting:${meetingId}`);
-	});
-
-	socket.on('leave_meeting', (meetingId: string) => {
-		socket.leave(`meeting:${meetingId}`);
-	});
-
-	socket.on('transcript_update', (data) => socket.to(`meeting:${data.meetingId}`).emit('transcript_update', data));
-	socket.on('action_item_created', (data) => socket.to(`meeting:${data.meetingId}`).emit('action_item_created', data));
-	socket.on('action_item_updated', (data) => socket.to(`meeting:${data.meetingId}`).emit('action_item_updated', data));
-	socket.on('poll_answer', (data) => socket.to(`meeting:${data.meetingId}`).emit('poll_answer', data));
-	socket.on('outcome_updated', (data) => socket.to(`meeting:${data.meetingId}`).emit('outcome_updated', data));
-	socket.on('note_created', (data) => socket.to(`meeting:${data.meetingId}`).emit('note_created', data));
-	socket.on('notification_received', (data) => socket.to(`meeting:${data.meetingId}`).emit('notification_received', data));
-	socket.on('meeting_status_changed', (data) => socket.to(`meeting:${data.meetingId}`).emit('meeting_status_changed', data));
-
-	socket.on('disconnect', () => {
-		for (const [meetingId, room] of meetingRooms.entries()) {
-			if (room.has(socket.id)) {
-				room.delete(socket.id);
-				io.to(`meeting:${meetingId}`).emit('peer_left', { socketId: socket.id });
-				if (room.size === 0) {
-					meetingRooms.delete(meetingId);
-					transcriptionSessions.delete(meetingId);
-				}
-			}
-		}
-	});
-});
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// ─── Auth Helpers ─────────────────────────────────────────────
-const generateToken = (id: string): string => jwt.sign({ id }, JWT_SECRET, { expiresIn: '30d' });
-
-// ─── SIGNUP ───────────────────────────────────────────────────
-app.post('/api/auth/signup', async (req: Request, res: Response): Promise<void> => {
-	try {
-		const { name, email, password } = req.body;
-		if (!name || !email || !password) {
-			res.status(400).json({ message: 'Please provide name, email, and password' });
-			return;
-		}
-
-		if (usingMongo && User) {
-			let existing = await User.findOne({ email });
-			if (existing) {
-				res.status(400).json({ message: 'User already exists' });
-				return;
-			}
-			const user = await User.create({ name, email, password });
-			res.status(201).json({ _id: user._id, name: user.name, email: user.email, token: generateToken(user._id) });
-			return;
-		}
-
-		const existing = inMemoryUsers.find(u => u.email === email.toLowerCase());
-		if (existing) {
-			res.status(400).json({ message: 'User already exists' });
-			return;
-		}
-		const salt = await bcrypt.genSalt(10);
-		const hashedPassword = await bcrypt.hash(password, salt);
-		const userId = `user_${Date.now()}`;
-		const user: InMemoryUser = { _id: userId, name, email: email.toLowerCase(), password: hashedPassword };
-		inMemoryUsers.push(user);
-		res.status(201).json({ _id: user._id, name: user.name, email: user.email, token: generateToken(user._id) });
-	} catch (error) {
-		console.error('Register error:', error);
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
+// Debug endpoint for persistence troubleshooting (Render + Atlas)
+app.get('/api/health', (req: any, res: any) => {
+    let readyState: number | null;
+    try {
+        const mongoose = require('mongoose');
+        readyState = mongoose.connection?.readyState;
+    } catch {
+        readyState = null;
+    }
+    res.json({
+        mongoConnected: usingMongoFlag && readyState === 1,
+        mongoReadyState: readyState,
+        mongoUriSet: !!process.env.MONGO_URI,
+        nodeEnv: process.env.NODE_ENV || 'development',
+    });
 });
 
-// ─── LOGIN ────────────────────────────────────────────────────
-app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> => {
-	try {
-		const { email, password } = req.body;
-		if (!email || !password) {
-			res.status(400).json({ message: 'Please provide email and password' });
-			return;
-		}
+// ── Socket.io Setup ──────────────────────────────────────────
+const io = new Server(server, { cors: { origin: '*', methods: ['GET', 'POST'] } });
+const connectedUsers = new Map<string, string>();
 
-		if (usingMongo && User) {
-			const user = await User.findOne({ email });
-			if (!user) {
-				res.status(401).json({ message: 'Invalid email or password' });
-				return;
-			}
-			const isMatch = await user.matchPassword(password);
-			if (!isMatch) {
-				res.status(401).json({ message: 'Invalid email or password' });
-				return;
-			}
-			res.json({ _id: user._id, name: user.name, email: user.email, token: generateToken(user._id) });
-			return;
-		}
-
-		const user = inMemoryUsers.find(u => u.email === email.toLowerCase());
-		if (!user) {
-			res.status(401).json({ message: 'Invalid email or password' });
-			return;
-		}
-		const isMatch = await bcrypt.compare(password, user.password);
-		if (!isMatch) {
-			res.status(401).json({ message: 'Invalid email or password' });
-			return;
-		}
-		res.json({ _id: user._id, name: user.name, email: user.email, token: generateToken(user._id) });
-	} catch (error) {
-		console.error('Login error:', error);
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
+io.use((socket: any, next: any) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('Authentication required'));
+    try {
+        const decoded: any = jwt.verify(token, JWT_SECRET);
+        socket.userId = decoded.id;
+        next();
+    } catch { next(new Error('Invalid token')); }
 });
 
-// ─── VERIFY ───────────────────────────────────────────────────
-app.get('/api/auth/verify', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		if (usingMongo && User && req.userId) {
-			const user = await User.findById(req.userId).select('-password');
-			if (!user) {
-				res.status(401).json({ message: 'User not found' });
-				return;
-			}
-			res.json(user);
-			return;
-		}
-		const user = inMemoryUsers.find(u => u._id === req.userId);
-		res.json(user ? { _id: user._id, name: user.name, email: user.email } : null);
-	} catch (error) {
-		res.status(500).json({ message: 'Server error' });
-	}
-});
+// ── Live state maps ──────────────────────────────────────────
+const meetingRooms = new Map<string, Map<string, any>>();
+const activeAgendaItems = new Map<string, string>();
 
-// ─── LOGOUT ───────────────────────────────────────────────────
-app.post('/api/auth/logout', (_req: Request, res: Response): void => {
-	res.json({ message: 'Logged out successfully' });
-});
+// ── Auth & helpers ───────────────────────────────────────────
+const generateToken = (id: any) => jwt.sign({ id }, JWT_SECRET, { expiresIn: '30d' });
+const { protect } = require('./middleware/auth');
 
-// ─── ME ───────────────────────────────────────────────────────
-app.get('/api/auth/me', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		if (usingMongo && User && req.userId) {
-			const user = await User.findById(req.userId).select('-password');
-			res.json(user);
-			return;
-		}
-		const user = inMemoryUsers.find(u => u._id === req.userId);
-		res.json(user ? { _id: user._id, name: user.name, email: user.email } : null);
-	} catch (error) {
-		res.status(500).json({ message: 'Server error' });
-	}
-});
+function emitToUser(userId: any, event: string, data: any) {
+    io.to(`user:${userId.toString()}`).emit(event, data);
+}
 
-// ─── Mock Data ────────────────────────────────────────────────
-const meetings: Meeting[] = [
-	{
-		id: 'mtg-001', title: 'Sprint Planning — Q1 Review', modality: 'Online',
-		date: '2026-03-05', time: '10:00 AM', host: 'Dr. Sharma',
-		participants: ['Ravi K.', 'Ananya P.', 'Kiran M.', 'Priya S.'], status: 'scheduled',
-		jitsiUrl: 'https://meet.jit.si/mcms-sprint-planning',
-	},
-	{
-		id: 'mtg-002', title: 'CS301 — Data Structures Lecture', modality: 'Hybrid',
-		date: '2026-03-06', time: '2:00 PM', host: 'Prof. Reddy',
-		participants: ['60 students'], status: 'scheduled',
-		jitsiUrl: 'https://meet.jit.si/mcms-cs301',
-	},
-	{
-		id: 'mtg-003', title: 'Frontend Candidate Evaluation', modality: 'Online',
-		date: '2026-02-28', time: '3:00 PM', host: 'HR Team',
-		participants: ['Priya S.', 'Ravi K.'], status: 'completed',
-	},
-];
+// ── Email Setup ──────────────────────────────────────────────
+let transporter: any = null;
+async function getMailTransporter() {
+    if (transporter) return transporter;
+    if (process.env.SENDGRID_API_KEY) {
+        transporter = nodemailer.createTransport({
+            host: 'smtp.sendgrid.net', port: 587, secure: false,
+            auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
+        });
+    } else if (process.env.SMTP_HOST) {
+        transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT!) || 587,
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        });
+    } else {
+        const testAccount = await nodemailer.createTestAccount();
+        transporter = nodemailer.createTransport({
+            host: 'smtp.ethereal.email', port: 587, secure: false,
+            auth: { user: testAccount.user, pass: testAccount.pass },
+        });
+        console.log('Using Ethereal test email — preview URLs in console');
+    }
+    return transporter;
+}
 
-const agendas: { [key: string]: Agenda[] } = {
-	'mtg-001': [
-		{ id: 'ag-1', title: 'Review Previous Sprint Goals', duration: 10, status: 'active', notes: '' },
-		{ id: 'ag-2', title: 'Demo: New Dashboard Module', duration: 15, status: 'pending', notes: '' },
-		{ id: 'ag-3', title: 'Plan next sprint tasks', duration: 20, status: 'pending', notes: '' },
-	],
+function generateRsvpToken(meetingId: any, userId: any) {
+    return jwt.sign({ meetingId: meetingId.toString(), userId: userId.toString(), purpose: 'rsvp' }, JWT_SECRET, { expiresIn: '30d' });
+}
+
+const { generateICS } = require('./services/icsGenerator');
+const { callAISummarize, callAIExtractActions } = require('./services/aiService');
+
+async function sendRsvpEmail(meeting: any, user: any, slot: any, icsBuffer: Buffer | null) {
+    try {
+        const transport = await getMailTransporter();
+        const token = generateRsvpToken(meeting._id, user._id);
+        const baseUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+
+        const makeLink = (response: string) =>
+            `${baseUrl}/api/rsvp/${meeting._id}/respond?token=${token}&response=${response}`;
+
+        const dateStr = slot ? `${slot.date} at ${slot.time}` : `${meeting.date} at ${meeting.time}`;
+        const meetingUrl = meeting.modality !== 'Offline' ? `${CLIENT_URL.replace(/\/$/, '')}?meeting=${meeting._id}` : null;
+        const meetingLinkSection = meetingUrl
+            ? `<p style="margin:16px 0"><strong>Meeting Link:</strong> <a href="${meetingUrl}" style="color:#6366f1">${meetingUrl}</a></p>`
+            : '';
+        const locationSection = meeting.location
+            ? `<p><strong>Location:</strong> ${meeting.location}</p>`
+            : '';
+
+        const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#1a1a2e">
+  <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px;border-radius:12px 12px 0 0;text-align:center">
+    <h1 style="color:#fff;margin:0;font-size:20px">Meeting Invitation</h1>
+  </div>
+  <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+    <h2 style="margin:0 0 16px;color:#1a1a2e">${meeting.title}</h2>
+    <p><strong>Date/Time:</strong> ${dateStr}</p>
+    <p><strong>Type:</strong> ${meeting.modality}</p>
+    ${locationSection}${meetingLinkSection}
+    <p style="margin:24px 0 12px;font-weight:600">Will you attend?</p>
+    <div style="display:flex;gap:12px">
+      <a href="${makeLink('yes')}" style="display:inline-block;padding:10px 28px;background:#22c55e;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Yes</a>
+      <a href="${makeLink('no')}" style="display:inline-block;padding:10px 28px;background:#ef4444;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">No</a>
+      <a href="${makeLink('maybe')}" style="display:inline-block;padding:10px 28px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Maybe</a>
+    </div>
+  </div>
+</body></html>`;
+
+        const attachments: any[] = [];
+        if (icsBuffer) {
+            attachments.push({
+                filename: 'meeting.ics',
+                content: icsBuffer,
+                contentType: 'text/calendar',
+            });
+        }
+
+        const info = await transport.sendMail({
+            from: process.env.SMTP_FROM || '"MCMS Platform" <noreply@mcms.app>',
+            to: user.email,
+            subject: `Meeting Invitation: ${meeting.title}`,
+            html,
+            attachments,
+        });
+
+        const previewUrl = nodemailer.getTestMessageUrl(info);
+        if (previewUrl) console.log(`Preview RSVP email for ${user.email}: ${previewUrl}`);
+    } catch (err: any) {
+        console.error('Failed to send RSVP email:', err.message);
+    }
+}
+
+// ── In-memory fallback stores (empty for new users; populated as they create data) ──
+const inMemoryMeetings: any[] = [];
+const inMemoryAgendas: Record<string, any[]> = {};
+const inMemoryTranscripts: Record<string, any[]> = {};
+const inMemoryActionItems: Record<string, any[]> = {};
+
+// ── Shared deps object for routes ────────────────────────────
+const deps = {
+    User, Meeting, Poll, Notification, RSVP, Agenda, protect, usingMongo,
+    generateToken, emitToUser, sendRsvpEmail, generateICS,
+    inMemoryUsers, JWT_SECRET, PORT, CLIENT_URL,
+    inMemoryMeetings, inMemoryAgendas, inMemoryTranscripts, inMemoryActionItems,
+    callAISummarize,
 };
 
+// ── Mount Routes ─────────────────────────────────────────────
+app.use('/api/auth', require('./routes/auth')(deps));
+app.use('/api/users', require('./routes/auth')(deps));
+app.use('/api/meetings', require('./routes/meetings')(deps));
+app.use('/api/polls', require('./routes/polls')(deps));
+app.use('/api/agenda', require('./routes/agenda')(deps));
+app.use('/api/action-items', require('./routes/actionItems')(deps));
+app.use('/api/attendance', require('./routes/attendance')(deps));
+app.use('/api/archive', require('./routes/archive')(deps));
+app.use('/api/search', require('./routes/search')(deps));
+app.use('/api/rubric', require('./routes/rubric')(deps));
+app.use('/api/pins', require('./routes/pins')(deps));
+app.use('/api/dashboard', require('./routes/dashboard')(deps));
+app.use('/api/notifications', require('./routes/notifications')(deps));
+app.use('/api/rsvp', require('./routes/rsvp')(deps));
+app.use('/api/profile', require('./routes/profile')(deps));
+app.use('/api/transcript', require('./routes/transcript')(deps));
 
+// ── Socket.io event handlers ─────────────────────────────────
+io.on('connection', (socket: any) => {
+    connectedUsers.set(socket.userId, socket.id);
+    socket.join(`user:${socket.userId}`);
 
-// ─── Protected API Routes ────────────────────────────────────
-app.get('/api/meetings', protect, async (_req: Request, res: Response): Promise<void> => {
-	try {
-		if (usingMongo && Meeting) {
-			const dbMeetings = await Meeting.find({}).sort({ createdAt: -1 }).populate('participants', 'name email');
-			const formatted = dbMeetings.map((m: any) => ({
-				id: m._id,
-				title: m.title,
-				modality: m.modality,
-				date: m.date,
-				time: m.time,
-				confirmedDate: m.confirmedDate,
-				confirmedTime: m.confirmedTime,
-				location: m.location,
-				host: m.host || 'Unknown',
-				hostId: m.hostId,
-				participants: m.participants,
-				status: m.status,
-				jitsiUrl: m.jitsiUrl,
-				jitsiRoomName: m.jitsiRoomName,
-				pollId: m.pollId,
-			}));
-			res.json([...formatted, ...meetings]);
-			return;
-		}
-		res.json(meetings);
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
+    // WebRTC Signaling
+    socket.on('join_room', async ({ meetingId, name, profileImage }: any) => {
+        if (!meetingId) return;
+        socket.join(`meeting:${meetingId}`);
+
+        if (!meetingRooms.has(meetingId)) meetingRooms.set(meetingId, new Map());
+        const room = meetingRooms.get(meetingId)!;
+
+        const existingPeers: any[] = [];
+        for (const [sid, info] of room.entries()) {
+            existingPeers.push({ socketId: sid, userId: info.userId, name: info.name, profileImage: info.profileImage });
+        }
+
+        room.set(socket.id, { userId: socket.userId, name: name || 'User', profileImage: profileImage || null });
+        socket.emit('room_peers', { peers: existingPeers });
+        socket.to(`meeting:${meetingId}`).emit('peer_joined', {
+            socketId: socket.id, userId: socket.userId,
+            name: name || 'User', profileImage: profileImage || null,
+        });
+    });
+
+    socket.on('signal', ({ to, signal }: any) => io.to(to).emit('signal', { from: socket.id, signal }));
+
+    socket.on('leave_room', ({ meetingId }: any) => {
+        if (!meetingId) return;
+        socket.leave(`meeting:${meetingId}`);
+        const room = meetingRooms.get(meetingId);
+        if (room) { room.delete(socket.id); if (room.size === 0) meetingRooms.delete(meetingId); }
+        socket.to(`meeting:${meetingId}`).emit('peer_left', { socketId: socket.id });
+    });
+
+    // Agenda sync
+    socket.on('agenda_action', async ({ meetingId, action, itemId }: any) => {
+        if (!meetingId || !action || !itemId) return;
+        try {
+            if (usingMongoFlag && Agenda) {
+                const agenda = await Agenda.findOne({ meetingId });
+                if (!agenda) return;
+
+                const item = agenda.items.find((i: any) => i.id === itemId);
+                if (!item) return;
+
+                if (action === 'start') {
+                    for (const i of agenda.items) {
+                        if (i.status === 'active') i.status = 'paused';
+                    }
+                    item.status = 'active';
+                    item.startedAt = new Date();
+                    agenda.activeItemId = itemId;
+                    activeAgendaItems.set(meetingId, itemId);
+                } else if (action === 'pause') {
+                    item.status = 'paused';
+                    agenda.activeItemId = null;
+                    activeAgendaItems.delete(meetingId);
+                } else if (action === 'complete') {
+                    item.status = 'completed';
+                    item.completedAt = new Date();
+                    if (agenda.activeItemId === itemId) {
+                        agenda.activeItemId = null;
+                        activeAgendaItems.delete(meetingId);
+                    }
+                }
+
+                await agenda.save();
+                io.to(`meeting:${meetingId}`).emit('agenda_sync', {
+                    meetingId, items: agenda.items,
+                    activeItemId: agenda.activeItemId,
+                });
+            } else {
+                const items = inMemoryAgendas[meetingId];
+                if (!items) return;
+                const item = items.find((i: any) => i.id === itemId);
+                if (!item) return;
+
+                if (action === 'start') {
+                    items.forEach((i: any) => { if (i.status === 'active') i.status = 'paused'; });
+                    item.status = 'active';
+                    activeAgendaItems.set(meetingId, itemId);
+                } else if (action === 'pause') {
+                    item.status = 'paused';
+                    activeAgendaItems.delete(meetingId);
+                } else if (action === 'complete') {
+                    item.status = 'completed';
+                    activeAgendaItems.delete(meetingId);
+                }
+
+                io.to(`meeting:${meetingId}`).emit('agenda_sync', {
+                    meetingId, items,
+                    activeItemId: activeAgendaItems.get(meetingId) || null,
+                });
+            }
+        } catch (err: any) {
+            console.error('agenda_action error:', err.message);
+        }
+    });
+
+    // End meeting
+    socket.on('end_meeting', async ({ meetingId }: any) => {
+        if (!meetingId) return;
+        try {
+            if (usingMongoFlag && Meeting) {
+                const meeting = await Meeting.findById(meetingId);
+                if (meeting && meeting.status !== 'completed') {
+                    meeting.status = 'completed';
+                    await meeting.save();
+
+                    // Auto-extract action items from transcript
+                    try {
+                        const transcripts = await Transcript.find({ meetingId }).sort({ createdAt: 1 });
+                        if (transcripts.length > 0) {
+                            const fullText = transcripts.map((t: any) => `${t.speaker}: ${t.text}`).join('\n');
+                            const agenda = await Agenda.findOne({ meetingId });
+                            const agendaItems = agenda ? agenda.items : [];
+
+                            try {
+                                const actions = await callAIExtractActions(fullText);
+                                for (const a of actions) {
+                                    await ActionItem.create({
+                                        meetingId, title: a.title,
+                                        assigneeName: a.assignee || null,
+                                        category: a.category || 'Technical',
+                                        status: 'pending', deadline: a.deadline || null,
+                                        source: 'ai-extracted',
+                                        aiConfidence: a.confidence || null,
+                                    });
+                                }
+                            } catch (e: any) {
+                                console.error('AI action extraction failed:', e.message);
+                            }
+
+                            try {
+                                const summaries = await callAISummarize(
+                                    transcripts.map((t: any) => ({ text: t.text, speaker: t.speaker, agendaItemId: t.agendaItemId })),
+                                    agendaItems.map((i: any) => ({ id: i.id, title: i.title }))
+                                );
+                            } catch (e: any) {
+                                console.error('AI summarization failed:', e.message);
+                            }
+                        }
+                    } catch (e: any) {
+                        console.error('Post-meeting AI processing error:', e.message);
+                    }
+
+                    // Notify participants
+                    const participants = meeting.participants || [];
+                    for (const pid of participants) {
+                        try {
+                            const notif = await Notification.create({
+                                userId: pid, type: 'meeting_summary_ready',
+                                meetingId, message: `Summary ready for "${meeting.title}"`,
+                            });
+                            emitToUser(pid, 'notification', {
+                                _id: notif._id, type: notif.type,
+                                meetingId, message: notif.message,
+                                read: false, createdAt: notif.createdAt,
+                            });
+                        } catch (e) { /* non-critical */ }
+                    }
+                }
+            }
+
+            io.to(`meeting:${meetingId}`).emit('meeting_ended', { meetingId });
+
+            // Kick all peers out of the WebRTC room
+            const room = meetingRooms.get(meetingId);
+            if (room) {
+                for (const [sid] of room) {
+                    io.to(`meeting:${meetingId}`).emit('peer_left', { socketId: sid });
+                }
+                meetingRooms.delete(meetingId);
+            }
+        } catch (err: any) {
+            console.error('end_meeting error:', err.message);
+        }
+    });
+
+    socket.on('join_meeting', ({ meetingId }: any) => { if (meetingId) socket.join(`meeting:${meetingId}`); });
+    socket.on('leave_meeting', ({ meetingId }: any) => { if (meetingId) socket.leave(`meeting:${meetingId}`); });
+
+    socket.on('disconnect', () => {
+        connectedUsers.delete(socket.userId);
+        for (const [meetingId, room] of meetingRooms.entries()) {
+            if (room.has(socket.id)) {
+                room.delete(socket.id);
+                io.to(`meeting:${meetingId}`).emit('peer_left', { socketId: socket.id });
+
+                if (room.size === 0) {
+                    meetingRooms.delete(meetingId);
+                }
+            }
+        }
+    });
 });
 
-app.post('/api/meetings', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		const { title, modality, date, time, location, participants } = req.body;
-		let jitsiRoomName, jitsiUrl;
-		if (modality !== 'Offline' && req.userId) {
-			jitsiRoomName = `MCMS-${req.userId.substring(req.userId.length - 6)}-${Date.now()}`;
-			jitsiUrl = `https://meet.jit.si/${jitsiRoomName}`;
-		}
-		let hostName = 'You';
+// ── Pre-meeting brief cron (every hour) ──────────────────────
+const { generateBrief, formatBriefEmail } = require('./services/briefGenerator');
 
-		if (usingMongo && User && req.userId) {
-			const userDoc = await User.findById(req.userId);
-			if (userDoc) hostName = userDoc.name;
-		}
+cron.schedule('0 * * * *', async () => {
+    if (!usingMongoFlag || !Meeting) return;
+    try {
+        const now = new Date();
+        const in24h = new Date(now.getTime() + 25 * 3600000);
+        const in23h = new Date(now.getTime() + 23 * 3600000);
 
-		if (usingMongo && Meeting) {
-			const newMeeting = await Meeting.create({
-				title, modality, location,
-				date, time,
-				confirmedDate: date, confirmedTime: time,
-				host: hostName,
-				hostId: req.userId,
-				jitsiUrl, jitsiRoomName,
-				participants: participants || [],
-				status: 'scheduled'
-			});
-			res.status(201).json({
-				id: newMeeting._id, title: newMeeting.title, modality: newMeeting.modality,
-				date: newMeeting.date, time: newMeeting.time, location: newMeeting.location,
-				host: newMeeting.host, hostId: newMeeting.hostId, participants: newMeeting.participants,
-				status: newMeeting.status, jitsiUrl: newMeeting.jitsiUrl, jitsiRoomName: newMeeting.jitsiRoomName
-			});
-			return;
-		}
+        const meetings = await Meeting.find({
+            status: 'scheduled',
+            confirmedDate: {
+                $gte: in23h.toISOString().split('T')[0],
+                $lte: in24h.toISOString().split('T')[0],
+            },
+        }).populate('participants', 'name email');
 
-		const newMeeting: Meeting = {
-			id: `mtg-${Date.now()}`, title, modality, date, time,
-			host: hostName, participants: participants || [], status: 'scheduled',
-			jitsiUrl, jitsiRoomName
-		};
-		meetings.push(newMeeting);
-		res.status(201).json(newMeeting);
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
+        for (const meeting of meetings) {
+            try {
+                const brief = await generateBrief(meeting, callAISummarize);
+                const html = formatBriefEmail(brief, meeting._id, CLIENT_URL);
+                const transport = await getMailTransporter();
+
+                for (const p of meeting.participants) {
+                    await transport.sendMail({
+                        from: process.env.SMTP_FROM || '"MCMS Platform" <noreply@mcms.app>',
+                        to: p.email,
+                        subject: `Pre-Meeting Brief: ${meeting.title}`,
+                        html,
+                    });
+
+                    try {
+                        await Notification.create({
+                            userId: p._id, type: 'brief_ready',
+                            meetingId: meeting._id,
+                            message: `Pre-meeting brief ready for "${meeting.title}"`,
+                        });
+                        emitToUser(p._id, 'notification', {
+                            type: 'brief_ready', meetingId: meeting._id,
+                            message: `Pre-meeting brief ready for "${meeting.title}"`,
+                            read: false,
+                        });
+                    } catch (e) { /* non-critical */ }
+                }
+                console.log(`Brief sent for: ${meeting.title}`);
+            } catch (e: any) {
+                console.error(`Brief generation failed for ${meeting.title}:`, e.message);
+            }
+        }
+    } catch (e: any) {
+        console.error('Brief cron error:', e.message);
+    }
 });
 
-app.get('/api/meetings/:id', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		if (usingMongo && Meeting) {
-			const m = await Meeting.findById(req.params.id).populate('participants', 'name email');
-			if (!m) {
-				res.status(404).json({ message: 'Meeting not found' });
-				return;
-			}
-			res.json({
-				id: m._id, title: m.title, modality: m.modality, date: m.date, time: m.time,
-				confirmedDate: m.confirmedDate, confirmedTime: m.confirmedTime, location: m.location,
-				host: m.host, hostId: m.hostId, participants: m.participants, status: m.status,
-				jitsiUrl: m.jitsiUrl, jitsiRoomName: m.jitsiRoomName, pollId: m.pollId
-			});
-			return;
-		}
-		const meeting = meetings.find(mtg => mtg.id === req.params.id);
-		if (!meeting) res.status(404).json({ message: 'Meeting not found' });
-		else res.json(meeting);
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
+// ── Brief on-demand endpoint ─────────────────────────────────
+app.get('/api/meetings/:id/brief', protect, async (req: any, res: any) => {
+    try {
+        if (!usingMongoFlag || !Meeting) return res.status(400).json({ message: 'Database required' });
+        const meeting = await Meeting.findById(req.params.id);
+        if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
+        const brief = await generateBrief(meeting, callAISummarize);
+        res.json(brief);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
 });
 
-app.put('/api/meetings/:id', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		if (usingMongo && Meeting) {
-			const updated = await Meeting.findByIdAndUpdate(req.params.id, req.body, { new: true });
-			if (!updated) {
-				res.status(404).json({ message: 'Meeting not found' });
-				return;
-			}
-			res.json(updated);
-			return;
-		}
-		const idx = meetings.findIndex(mtg => mtg.id === req.params.id);
-		if (idx === -1) {
-			res.status(404).json({ message: 'Meeting not found' });
-			return;
-		}
-		meetings[idx] = { ...meetings[idx], ...req.body };
-		res.json(meetings[idx]);
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
+// ── Serve client build under /mcms (production) ──────────────
+const CLIENT_BUILD = path.join(__dirname, '..', '..', 'client', 'dist');
+app.use('/mcms', express.static(CLIENT_BUILD));
+app.get('/mcms/*path', (req: any, res: any) => {
+    res.sendFile(path.join(CLIENT_BUILD, 'index.html'));
 });
 
-app.delete('/api/meetings/:id', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		if (usingMongo && Meeting) {
-			const deleted = await Meeting.findByIdAndDelete(req.params.id);
-			if (!deleted) {
-				res.status(404).json({ message: 'Meeting not found' });
-				return;
-			}
-			res.json({ message: 'Meeting deleted successfully' });
-			return;
-		}
-		const idx = meetings.findIndex(mtg => mtg.id === req.params.id);
-		if (idx === -1) {
-			res.status(404).json({ message: 'Meeting not found' });
-			return;
-		}
-		meetings.splice(idx, 1);
-		res.json({ message: 'Meeting deleted successfully' });
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
+// ── Start Server ─────────────────────────────────────────────
+server.listen(PORT, () => {
+    console.log(`MCMS Backend running at http://localhost:${PORT}`);
+    console.log(`MongoDB: ${usingMongoFlag ? 'Connected' : 'Not running — users stored in-memory'}`);
 });
-
-app.post('/api/meetings/:id/start', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		if (usingMongo && Meeting) {
-			const meeting = await Meeting.findById(req.params.id);
-			if (!meeting) {
-				res.status(404).json({ message: 'Meeting not found' });
-				return;
-			}
-			meeting.status = 'in-progress';
-			await meeting.save();
-			res.json(meeting);
-			return;
-		}
-		const idx = meetings.findIndex(mtg => mtg.id === req.params.id);
-		if (idx === -1) {
-			res.status(404).json({ message: 'Meeting not found' });
-			return;
-		}
-		meetings[idx].status = 'in-progress';
-		res.json(meetings[idx]);
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
-});
-
-app.post('/api/agenda/:meetingId', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		const { items, totalDuration } = req.body;
-		if (usingMongo && Agenda) {
-			let agenda = await Agenda.findOne({ meetingId: req.params.meetingId });
-			if (agenda) {
-				agenda.items = items;
-				agenda.totalDuration = totalDuration || 0;
-				await agenda.save();
-			} else {
-				agenda = await Agenda.create({
-					meetingId: req.params.meetingId,
-					items: items || [],
-					totalDuration: totalDuration || 0
-				});
-			}
-			res.status(201).json(agenda);
-			return;
-		}
-		agendas[req.params.meetingId] = items;
-		res.status(201).json({ meetingId: req.params.meetingId, items, totalDuration: totalDuration || 0 });
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
-});
-
-app.get('/api/agenda/:meetingId', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		if (usingMongo && Agenda) {
-			const agenda = await Agenda.findOne({ meetingId: req.params.meetingId });
-			res.json(agenda || { items: [] });
-			return;
-		}
-		res.json({ items: agendas[req.params.meetingId] || [] });
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
-});
-
-app.put('/api/agenda/:meetingId/item/:itemId', protect, async (req: Request, res: Response): Promise<void> => {
-	try {
-		const { status } = req.body;
-		if (usingMongo && Agenda) {
-			const agenda = await Agenda.findOne({ meetingId: req.params.meetingId });
-			if (!agenda) {
-				res.status(404).json({ message: 'Agenda not found' });
-				return;
-			}
-			const item = agenda.items.find((i: any) => i.id === req.params.itemId);
-			if (!item) {
-				res.status(404).json({ message: 'Item not found' });
-				return;
-			}
-			const oldStatus = item.status;
-			Object.assign(item, req.body);
-			await agenda.save();
-
-			if (status && status !== oldStatus) {
-				io.to(req.params.meetingId).emit('meeting_status_changed', {
-					meetingId: req.params.meetingId,
-					agendaItemId: item.id,
-					status,
-					agendaId: agenda._id
-				});
-			}
-			res.json(agenda);
-			return;
-		}
-
-		const items = agendas[req.params.meetingId];
-		if (!items) {
-			res.status(404).json({ message: 'Agenda not found' });
-			return;
-		}
-		const idx = items.findIndex((i: any) => i.id === req.params.itemId);
-		if (idx === -1) {
-			res.status(404).json({ message: 'Item not found' });
-			return;
-		}
-		const oldStatus = items[idx].status;
-		items[idx] = { ...items[idx], ...req.body };
-		if (status && status !== oldStatus) {
-			io.to(req.params.meetingId).emit('meeting_status_changed', {
-				meetingId: req.params.meetingId,
-				agendaItemId: req.params.itemId,
-				status
-			});
-		}
-		res.json({ items });
-	} catch (error) {
-		res.status(500).json({ message: 'Server error', error: (error as Error).message });
-	}
-});
-
-
-
-// ─── Start Server ────────────────────────────────────────────
-httpServer.listen(PORT, () => {
-	console.log(`✅ MCMS Backend running at http://localhost:${PORT}`);
-	console.log(`   MongoDB: ${usingMongo ? 'Connected' : 'Not running — users stored in-memory (lost on restart)'}`);
-});
-
-export default app;

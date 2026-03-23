@@ -1,97 +1,105 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-const API_BASE = `${import.meta.env.VITE_API_URL ?? "http://localhost:5000"}/api`;
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  token?: string;
-  [key: string]: any;
+export interface User {
+    token?: string;
+    name?: string;
+    email?: string;
+    id?: string;
+    [key: string]: unknown;
 }
 
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  register: (name: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  logout: () => void;
+export type AuthResult = {
+    success: true;
+} | {
+    success: false;
+    message: string;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export interface AuthContextValue {
+    user: User | null;
+    login: (email: string, password: string) => Promise<AuthResult>;
+    register: (name: string, email: string, password: string) => Promise<AuthResult>;
+    logout: () => void;
+    updateUser: (updates: Partial<User>) => void;
+    loading: boolean;
+}
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
-};
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export const useAuth = () => useContext(AuthContext);
 
 interface AuthProviderProps {
-  children: ReactNode;
+    children: ReactNode;
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Check for logged-in user on mount
-    const userInfo = localStorage.getItem('mcms_userInfo');
-    if (userInfo) {
-      setUser(JSON.parse(userInfo));
-    }
-    setLoading(false);
-  }, []);
+    useEffect(() => {
+        const userInfo = localStorage.getItem('mcms_userInfo');
+        if (userInfo) {
+            setUser(JSON.parse(userInfo));
+        }
+        setLoading(false);
+    }, []);
 
-  const login = async (email: string, password: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
+    const login = async (email: string, password: string): Promise<AuthResult> => {
+        try {
+            const res = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || 'Login failed');
+            if (!res.ok) throw new Error(data.message || 'Login failed');
 
-      localStorage.setItem('mcms_userInfo', JSON.stringify(data));
-      setUser(data);
-      return { success: true };
-    } catch (error) {
-      return { success: false, message: (error as Error).message };
-    }
-  };
+            localStorage.setItem('mcms_userInfo', JSON.stringify(data));
+            setUser(data);
+            return { success: true };
+        } catch (error) {
+            return { success: false, message: (error as Error).message };
+        }
+    };
 
-  const register = async (name: string, email: string, password: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
-      });
-      const data = await res.json();
+    const register = async (name: string, email: string, password: string): Promise<AuthResult> => {
+        try {
+            const res = await fetch(`${API_BASE}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, password })
+            });
+            const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || 'Registration failed');
+            if (!res.ok) throw new Error(data.message || 'Registration failed');
 
-      localStorage.setItem('mcms_userInfo', JSON.stringify(data));
-      setUser(data);
-      return { success: true };
-    } catch (error) {
-      return { success: false, message: (error as Error).message };
-    }
-  };
+            localStorage.setItem('mcms_userInfo', JSON.stringify(data));
+            setUser(data);
+            return { success: true };
+        } catch (error) {
+            return { success: false, message: (error as Error).message };
+        }
+    };
 
-  const logout = () => {
-    localStorage.removeItem('mcms_userInfo');
-    setUser(null);
-  };
+    const updateUser = (updates: Partial<User>): void => {
+        setUser(prev => {
+            const updated = { ...prev, ...updates };
+            localStorage.setItem('mcms_userInfo', JSON.stringify(updated));
+            return updated as User | null;
+        });
+    };
 
-  return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
-      {!loading && children}
-    </AuthContext.Provider>
-  );
+    const logout = (): void => {
+        localStorage.removeItem('mcms_userInfo');
+        setUser(null);
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, login, register, logout, updateUser, loading }}>
+            {!loading && children}
+        </AuthContext.Provider>
+    );
 };

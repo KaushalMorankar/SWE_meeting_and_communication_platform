@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import Icon from './Icon';
 import {
     Mic01Icon, MicOff01Icon, Video01Icon, VideoOffIcon,
@@ -36,52 +36,24 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
     onLeave, hasJoined, onMeetingEnded,
 }, ref) {
     const { socket } = useSocket();
-    const [recording, setRecording] = useState(false);
     const [showQR, setShowQR] = useState(false);
     const [copied, setCopied] = useState(false);
 
     useImperativeHandle(ref, () => ({
-        toggleRecording: () => {
-            if (!socket || !meetingId) return;
-            if (recording) socket.emit('stop_transcription', { meetingId });
-            else socket.emit('start_transcription', { meetingId });
-        },
+        toggleRecording: () => {},
         showAttendance: () => setShowQR(true),
         endMeeting: () => {
             if (!socket || !meetingId) return;
-            if (recording) socket.emit('stop_transcription', { meetingId });
             socket.emit('end_meeting', { meetingId });
             onMeetingEnded?.();
         },
-    }), [socket, meetingId, recording, onMeetingEnded]);
-
-    useEffect(() => {
-        if (!socket) return;
-        const onStarted = ({ meetingId: mid }: { meetingId?: string }) => { if (mid === meetingId) setRecording(true); };
-        const onStopped = ({ meetingId: mid }: { meetingId?: string }) => { if (mid === meetingId) setRecording(false); };
-        socket.on('transcription_started', onStarted);
-        socket.on('transcription_stopped', onStopped);
-        return () => {
-            socket.off('transcription_started', onStarted);
-            socket.off('transcription_stopped', onStopped);
-        };
-    }, [socket, meetingId]);
-
-    const toggleRecording = useCallback(() => {
-        if (!socket || !meetingId) return;
-        if (recording) {
-            socket.emit('stop_transcription', { meetingId });
-        } else {
-            socket.emit('start_transcription', { meetingId });
-        }
-    }, [socket, meetingId, recording]);
+    }), [socket, meetingId, onMeetingEnded]);
 
     const handleEndMeeting = useCallback(() => {
         if (!socket || !meetingId) return;
-        if (recording) socket.emit('stop_transcription', { meetingId });
         socket.emit('end_meeting', { meetingId });
         onMeetingEnded?.();
-    }, [socket, meetingId, recording, onMeetingEnded]);
+    }, [socket, meetingId, onMeetingEnded]);
 
     const handleCopyLink = useCallback(() => {
         if (!meetingId) return;
@@ -128,15 +100,10 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
 
                     <div className="controls-divider"></div>
 
-                    <ShortcutTooltip label={recording ? 'Stop recording' : 'Record'} keys={['R']} position="top">
-                        <button
-                            className={`control-btn ${recording ? 'recording' : ''}`}
-                            onClick={toggleRecording}
-                            disabled={!hasJoined}
-                        >
+                    <ShortcutTooltip label="Live transcription is not available yet" position="top">
+                        <button type="button" className="control-btn" disabled style={{ opacity: 0.55, cursor: 'not-allowed' }}>
                             <Icon icon={RecordIcon} size={16} />
-                            <span>{recording ? 'Recording' : 'Record'}</span>
-                            {recording && <div className="rec-dot"></div>}
+                            <span>Transcript</span>
                         </button>
                     </ShortcutTooltip>
 
@@ -152,7 +119,7 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
                         <span>Participants</span>
                     </button>
 
-                    <button className="control-btn" onClick={handleCopyLink}>
+                    <button type="button" className="control-btn" onClick={handleCopyLink}>
                         <Icon icon={Link01Icon} size={16} />
                         <span>{copied ? 'Copied!' : 'Copy Link'}</span>
                     </button>
