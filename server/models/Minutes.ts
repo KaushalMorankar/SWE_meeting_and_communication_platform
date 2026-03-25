@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import type { Document } from 'mongoose';
 
-interface IAgendaItem {
+interface IMinutesItem {
 	id: string;
 	title: string;
 	description?: string;
@@ -13,15 +13,14 @@ interface IAgendaItem {
 	notes?: string;
 }
 
-interface IAgenda extends Document {
+interface IMinutes extends Document {
 	meetingId: mongoose.Types.ObjectId;
-	items: IAgendaItem[];
-	totalDuration: number;
+	items: IMinutesItem[];
 	createdAt: Date;
 	updatedAt: Date;
 }
 
-const agendaItemSchema = new mongoose.Schema({
+const minutesItemSchema = new mongoose.Schema({
 	id: { type: String, required: true },
 	title: { type: String, required: true, maxlength: 200 },
 	description: { type: String },
@@ -33,13 +32,12 @@ const agendaItemSchema = new mongoose.Schema({
 	notes: { type: String, default: '' }
 }, { _id: false });
 
-const agendaSchema = new mongoose.Schema({
+const minutesSchema = new mongoose.Schema({
 	meetingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Meeting', required: true, unique: true },
-	items: [agendaItemSchema],
-	activeItemId: { type: String, default: null },
+	items: [minutesItemSchema],
 	createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, {
 	timestamps: true,
 });
 
-export = mongoose.model('Agenda', agendaSchema);
+export = mongoose.model('Minutes', minutesSchema);

@@ -3,7 +3,7 @@ import Icon from './Icon';
 import ShortcutTooltip from './ShortcutTooltip';
 import {
     CheckmarkCircle01Icon, Clock01Icon, AlertCircleIcon,
-    ArrowRight01Icon, ArrowDown01Icon, ArrowUp01Icon,
+    ArrowRight01Icon,
     FlashIcon, Add01Icon, Delete02Icon, SparklesIcon,
 } from '@hugeicons/core-free-icons';
 
@@ -26,6 +26,23 @@ const statusConfig = {
 const CATEGORIES = ['Technical', 'Administrative', 'Decision', 'Follow-up'];
 const STATUSES = ['draft', 'pending', 'in-progress', 'completed'];
 
+function deadlineToApi(dateStr: string, timeStr: string, includeTime: boolean): string | null {
+    const d = dateStr?.trim();
+    if (!d) return null;
+    if (includeTime && timeStr?.trim()) return `${d}T${timeStr.trim()}`;
+    return d;
+}
+
+function formatDeadlineDisplay(deadline: string | undefined): string {
+    if (!deadline) return '';
+    if (deadline.includes('T')) {
+        const [datePart, rest] = deadline.split('T');
+        const hm = (rest || '').slice(0, 5);
+        return hm ? `${datePart} · ${hm}` : datePart;
+    }
+    return deadline;
+}
+
 interface ActionItem {
     id?: string;
     _id?: string;
@@ -47,11 +64,12 @@ interface ActionItemsProps {
 }
 
 export default function ActionItems({ items, meetingId, fetchWithAuth, onRefresh, addActionItemTrigger, onAddTriggered }: ActionItemsProps) {
-    const [collapsed, setCollapsed] = useState(false);
     const [adding, setAdding] = useState(false);
     const [newTitle, setNewTitle] = useState('');
     const [newCategory, setNewCategory] = useState('Technical');
-    const [newDeadline, setNewDeadline] = useState('');
+    const [newDeadlineDate, setNewDeadlineDate] = useState('');
+    const [newDeadlineTime, setNewDeadlineTime] = useState('');
+    const [newDeadlineIncludeTime, setNewDeadlineIncludeTime] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -61,17 +79,24 @@ export default function ActionItems({ items, meetingId, fetchWithAuth, onRefresh
         }
     }, [addActionItemTrigger, onAddTriggered]);
 
+    const resetDeadlineFields = () => {
+        setNewDeadlineDate('');
+        setNewDeadlineTime('');
+        setNewDeadlineIncludeTime(false);
+    };
+
     const handleCreate = async () => {
         if (!newTitle.trim() || !meetingId) return;
+        const deadline = deadlineToApi(newDeadlineDate, newDeadlineTime, newDeadlineIncludeTime);
         try {
             const res = await (fetchWithAuth || fetch)(`${API_BASE}/action-items/${meetingId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: newTitle.trim(), category: newCategory, deadline: newDeadline || null }),
+                body: JSON.stringify({ title: newTitle.trim(), category: newCategory, deadline: deadline || null }),
             });
             if (res.ok) {
                 setNewTitle('');
-                setNewDeadline('');
+                resetDeadlineFields();
                 setAdding(false);
                 onRefresh?.();
             }
@@ -104,17 +129,15 @@ export default function ActionItems({ items, meetingId, fetchWithAuth, onRefresh
 
     return (
         <div className="action-items-section">
-            <div className="section-header collapsible-header" style={{ borderTop: '0.0625rem solid var(--border)' }} onClick={() => setCollapsed(c => !c)}>
+            <div className="section-header">
                 <div className="section-title-container">
                     <Icon icon={FlashIcon} size={14} />
                     <span className="section-title">Action Items</span>
                     <span className="chip chip-blue">{items.length}</span>
                 </div>
-                <Icon icon={collapsed ? ArrowDown01Icon : ArrowUp01Icon} size={14} />
             </div>
 
-            <div className={`collapsible-body ${collapsed ? 'collapsed' : ''}`}>
-                <div className="collapsible-body-inner">
+            <div className="action-items-body">
                 <div className="action-items-list">
                     {items.map((item, index) => {
                         const status = statusConfig[item.status] || statusConfig.pending;
@@ -177,7 +200,7 @@ export default function ActionItems({ items, meetingId, fetchWithAuth, onRefresh
                                     {item.deadline && (
                                         <span className="ai-card-deadline">
                                             <Icon icon={Clock01Icon} size={10} />
-                                            {item.deadline}
+                                            {formatDeadlineDisplay(item.deadline)}
                                         </span>
                                     )}
                                 </div>
@@ -186,7 +209,7 @@ export default function ActionItems({ items, meetingId, fetchWithAuth, onRefresh
                     })}
 
                     {adding ? (
-                        <div className="glass-card inline-form-card" onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setAdding(false); } }}>
+                        <div className="glass-card inline-form-card" onKeyDown={(e: React.KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setAdding(false); resetDeadlineFields(); } }}>
                             <input
                                 className="input-field"
                                 placeholder="Action item title..."
@@ -194,7 +217,7 @@ export default function ActionItems({ items, meetingId, fetchWithAuth, onRefresh
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTitle(e.target.value)}
                                 onKeyDown={(e: React.KeyboardEvent) => {
                                     if (e.key === 'Enter') handleCreate();
-                                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setAdding(false); }
+                                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setAdding(false); resetDeadlineFields(); }
                                 }}
                                 autoFocus
                                 style={{ marginBottom: '0.25rem' }}
@@ -207,14 +230,39 @@ export default function ActionItems({ items, meetingId, fetchWithAuth, onRefresh
                                 >
                                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
-                                <input
-                                    type="date"
-                                    className="input-field"
-                                    value={newDeadline}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDeadline(e.target.value)}
-                                />
+                            </div>
+                            <div className="action-item-deadline-block">
+                                <span className="action-item-deadline-label">Deadline</span>
+                                <div className="action-item-deadline-row">
+                                    <input
+                                        type="date"
+                                        className="input-field"
+                                        value={newDeadlineDate}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDeadlineDate(e.target.value)}
+                                        aria-label="Deadline date"
+                                    />
+                                    <label className="action-item-time-toggle">
+                                        <input
+                                            type="checkbox"
+                                            checked={newDeadlineIncludeTime}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDeadlineIncludeTime(e.target.checked)}
+                                        />
+                                        <span>Time</span>
+                                    </label>
+                                    {newDeadlineIncludeTime && (
+                                        <input
+                                            type="time"
+                                            className="input-field"
+                                            value={newDeadlineTime}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDeadlineTime(e.target.value)}
+                                            aria-label="Deadline time"
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                            <div className="inline-form-row" style={{ marginTop: '0.35rem' }}>
                                 <button className="btn btn-sm btn-primary" onClick={handleCreate}>Add</button>
-                                <button className="btn btn-sm btn-secondary" onClick={() => setAdding(false)}>Cancel</button>
+                                <button className="btn btn-sm btn-secondary" onClick={() => { setAdding(false); resetDeadlineFields(); }}>Cancel</button>
                             </div>
                         </div>
                     ) : (
@@ -230,7 +278,6 @@ export default function ActionItems({ items, meetingId, fetchWithAuth, onRefresh
                             </ShortcutTooltip>
                         )
                     )}
-                </div>
                 </div>
             </div>
         </div>

@@ -4,16 +4,14 @@ import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
 import AgendaPanel from "./components/AgendaPanel";
 import VideoArea from "./components/VideoArea";
-import TranscriptFeed from "./components/TranscriptFeed";
+import MinutesPanel from "./components/MinutesPanel";
 import ActionItems from "./components/ActionItems";
-import LiveOutcome from "./components/LiveOutcome";
 import MeetingCreation from "./components/MeetingCreation";
 import ProductivityDashboard from "./components/ProductivityDashboard";
 import PollVoting from "./components/PollVoting";
 import ProfileSettings from "./components/ProfileSettings";
 import ArchiveView from "./components/ArchiveView";
 import RubricSidebar from "./components/RubricSidebar";
-import PinModal from "./components/PinModal";
 import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts";
 import Icon from "./components/Icon";
 import { Calendar02Icon, Clock01Icon, UserIcon } from "@hugeicons/core-free-icons";
@@ -48,14 +46,10 @@ function DashboardApp() {
 
   const [meetings, setMeetings] = useState<any[]>([]);
   const [agendaItems, setAgendaItems] = useState<any[]>([]);
-  const [transcripts, setTranscripts] = useState<any[]>([]);
+  const [minutesItems, setMinutesItems] = useState<any[]>([]);
   const [actionItems, setActionItems] = useState<any[]>([]);
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<any>(null);
-  const [pins, setPins] = useState<any[]>([]);
-  const [pinTimestamp, setPinTimestamp] = useState<string | null>(null);
-  const [showPinModal, setShowPinModal] = useState(false);
-
   const [agendaPanelOpen, setAgendaPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [addActionItemTrigger, setAddActionItemTrigger] = useState(0);
@@ -136,9 +130,8 @@ function DashboardApp() {
   useEffect(() => {
     if (selectedMeeting) {
       fetchAgenda(selectedMeeting.id);
-      fetchTranscript(selectedMeeting.id);
+      fetchMinutes(selectedMeeting.id);
       fetchActionItems(selectedMeeting.id);
-      fetchPins(selectedMeeting.id);
     }
   }, [selectedMeeting]);
 
@@ -147,12 +140,6 @@ function DashboardApp() {
     const meetingId = selectedMeeting.id;
     socket.emit('join_meeting', { meetingId });
 
-    const handleTranscriptUpdate = (segment: any) => {
-      if (segment.meetingId === meetingId) setTranscripts(prev => [...prev, segment]);
-    };
-    const handleTranscriptReplaced = ({ meetingId: replacedId }: { meetingId: string }) => {
-      if (replacedId === meetingId) fetchTranscript(meetingId);
-    };
     const handleAgendaSync = ({ meetingId: mid, items }: { meetingId: string; items: any[] }) => {
       if (mid === meetingId) setAgendaItems(items);
     };
@@ -163,15 +150,11 @@ function DashboardApp() {
       }
     };
 
-    socket.on('transcript_update', handleTranscriptUpdate);
-    socket.on('transcript_replaced', handleTranscriptReplaced);
     socket.on('agenda_sync', handleAgendaSync);
     socket.on('meeting_ended', handleMeetingEnded);
 
     return () => {
       socket.emit('leave_meeting', { meetingId });
-      socket.off('transcript_update', handleTranscriptUpdate);
-      socket.off('transcript_replaced', handleTranscriptReplaced);
       socket.off('agenda_sync', handleAgendaSync);
       socket.off('meeting_ended', handleMeetingEnded);
     };
@@ -195,11 +178,14 @@ function DashboardApp() {
     } catch (err) { console.error("Failed to fetch agenda:", err); }
   };
 
-  const fetchTranscript = async (meetingId: string) => {
+  const fetchMinutes = async (meetingId: string) => {
     try {
-      const res = await fetchWithAuth(`${API_BASE}/transcript/${meetingId}`);
-      if (res.ok) setTranscripts(await res.json());
-    } catch (err) { console.error("Failed to fetch transcript:", err); }
+      const res = await fetchWithAuth(`${API_BASE}/minutes/${meetingId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMinutesItems(Array.isArray(data) ? data.map((i: any) => ({ ...i, duration: typeof i.duration === "number" ? i.duration : 0 })) : []);
+      }
+    } catch (err) { console.error("Failed to fetch minutes:", err); }
   };
 
   const fetchActionItems = async (meetingId: string) => {
@@ -216,13 +202,6 @@ function DashboardApp() {
     } catch (err) { console.error("Failed to fetch dashboard stats:", err); }
   };
 
-  const fetchPins = async (meetingId: string) => {
-    try {
-      const res = await fetchWithAuth(`${API_BASE}/pins/${meetingId}`);
-      if (res.ok) setPins(await res.json());
-    } catch (err) { console.error("Failed to fetch pins:", err); }
-  };
-
   const handleCreateMeeting = async (meetingData: any) => {
     try {
       const res = await fetchWithAuth(`${API_BASE}/meetings`, { method: "POST", body: JSON.stringify(meetingData) });
@@ -236,11 +215,6 @@ function DashboardApp() {
     return null;
   };
 
-  const handlePinResource = (timestamp: string) => {
-    setPinTimestamp(timestamp);
-    setShowPinModal(true);
-  };
-
   const handleMeetingEnded = () => {
     if (selectedMeeting) {
       setMeetings(prev => prev.map(m => (m.id === selectedMeeting.id ? { ...m, status: 'completed' } : m)));
@@ -248,7 +222,15 @@ function DashboardApp() {
     }
   };
 
-  const isHost = selectedMeeting?.hostId === user?._id;
+  const handleMinutesChange = async (items: any[]) => {
+    const normalized = items.map((i) => ({ ...i, duration: typeof i.duration === "number" ? i.duration : 0 }));
+    setMinutesItems(normalized);
+    const mid = selectedMeeting?.id;
+    if (!mid) return;
+    try {
+      await fetchWithAuth(`${API_BASE}/minutes/${mid}`, { method: "POST", body: JSON.stringify({ items: normalized }) });
+    } catch (err) { console.error("Failed to save minutes:", err); }
+  };
 
   const renderContent = () => {
     switch (currentView) {
@@ -265,7 +247,7 @@ function DashboardApp() {
             <div style={{ flex: 1, overflow: "auto", padding: "1.5rem" }}>
               <h2 style={{ fontSize: "1.375rem", fontWeight: 700, marginBottom: "1rem" }}>Live Meeting</h2>
               <p style={{ color: "var(--text-muted)", marginBottom: "1rem" }}>
-                Select a meeting below to join the call and see agenda, transcript, and notes.
+                Select a meeting below to join the call and see agenda, minutes, and action items.
               </p>
               <div className="meeting-list">
                 {meetings.map(meeting => (
@@ -295,13 +277,7 @@ function DashboardApp() {
               <div className="meeting-side-panel meeting-side-panel-left open">
                 <AgendaPanel
                   agendaItems={agendaItems}
-                  meetingId={selectedMeeting.id}
-                  isHost={isHost}
                   onItemChange={setAgendaItems}
-                  onClose={toggleAgendaPanel}
-                  fetchWithAuth={fetchWithAuth}
-                  addAgendaItemTrigger={addAgendaItemTrigger}
-                  onAddTriggered={() => setAddAgendaItemTrigger(0)}
                 />
                 <RubricSidebar
                   meetingId={selectedMeeting.id}
@@ -328,21 +304,22 @@ function DashboardApp() {
             {rightPanelOpen && (
               <div className="meeting-side-panel meeting-side-panel-right open">
                 <div className="right-panel-content">
-                  <TranscriptFeed
-                    transcripts={transcripts}
-                    onClosePanel={toggleRightPanel}
-                    onPinResource={handlePinResource}
-                    pins={pins}
-                  />
-                  <ActionItems
-                    items={actionItems}
-                    meetingId={selectedMeeting.id}
-                    fetchWithAuth={fetchWithAuth}
-                    onRefresh={() => fetchActionItems(selectedMeeting.id)}
-                    addActionItemTrigger={addActionItemTrigger}
-                    onAddTriggered={() => setAddActionItemTrigger(0)}
-                  />
-                  <LiveOutcome agendaItems={agendaItems} actionItems={actionItems} transcripts={transcripts} />
+                  <div className="right-panel-half right-panel-half-minutes">
+                    <MinutesPanel
+                      minutesItems={minutesItems}
+                      onItemChange={handleMinutesChange}
+                    />
+                  </div>
+                  <div className="right-panel-half right-panel-half-actions">
+                    <ActionItems
+                      items={actionItems}
+                      meetingId={selectedMeeting.id}
+                      fetchWithAuth={fetchWithAuth}
+                      onRefresh={() => fetchActionItems(selectedMeeting.id)}
+                      addActionItemTrigger={addActionItemTrigger}
+                      onAddTriggered={() => setAddActionItemTrigger(0)}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -438,15 +415,6 @@ function DashboardApp() {
         <PollVoting meetingId={pollMeetingId} onClose={() => setPollMeetingId(null)} />
       )}
 
-      {showPinModal && selectedMeeting && (
-        <PinModal
-          meetingId={selectedMeeting.id}
-          transcriptTimestamp={pinTimestamp}
-          onClose={() => { setShowPinModal(false); setPinTimestamp(null); }}
-          fetchWithAuth={fetchWithAuth}
-          onPinCreated={() => fetchPins(selectedMeeting.id)}
-        />
-      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ dotenv.config();
 // ── Optional MongoDB connection ──────────────────────────────
 let usingMongoFlag = false;
 let User: any = null, Meeting: any = null, Poll: any = null, Notification: any = null, RSVP: any = null;
-let Transcript: any = null, Agenda: any = null, ActionItem: any = null, Attendance: any = null;
+let Transcript: any = null, Agenda: any = null, Minutes: any = null, ActionItem: any = null, Attendance: any = null;
 
 try {
     const mongoose = require('mongoose');
@@ -35,6 +35,7 @@ try {
     RSVP = require('./models/RSVP');
     Transcript = require('./models/Transcript');
     Agenda = require('./models/Agenda');
+    Minutes = require('./models/Minutes');
     ActionItem = require('./models/ActionItem');
     Attendance = require('./models/Attendance');
 } catch (e) {
@@ -198,15 +199,16 @@ async function sendRsvpEmail(meeting: any, user: any, slot: any, icsBuffer: Buff
 // ── In-memory fallback stores (empty for new users; populated as they create data) ──
 const inMemoryMeetings: any[] = [];
 const inMemoryAgendas: Record<string, any[]> = {};
+const inMemoryMinutes: Record<string, any[]> = {};
 const inMemoryTranscripts: Record<string, any[]> = {};
 const inMemoryActionItems: Record<string, any[]> = {};
 
 // ── Shared deps object for routes ────────────────────────────
 const deps = {
-    User, Meeting, Poll, Notification, RSVP, Agenda, protect, usingMongo,
+    User, Meeting, Poll, Notification, RSVP, Agenda, Minutes, protect, usingMongo,
     generateToken, emitToUser, sendRsvpEmail, generateICS,
     inMemoryUsers, JWT_SECRET, PORT, CLIENT_URL,
-    inMemoryMeetings, inMemoryAgendas, inMemoryTranscripts, inMemoryActionItems,
+    inMemoryMeetings, inMemoryAgendas, inMemoryMinutes, inMemoryTranscripts, inMemoryActionItems,
     callAISummarize,
 };
 
@@ -216,6 +218,7 @@ app.use('/api/users', require('./routes/auth')(deps));
 app.use('/api/meetings', require('./routes/meetings')(deps));
 app.use('/api/polls', require('./routes/polls')(deps));
 app.use('/api/agenda', require('./routes/agenda')(deps));
+app.use('/api/minutes', require('./routes/minutes')(deps));
 app.use('/api/action-items', require('./routes/actionItems')(deps));
 app.use('/api/attendance', require('./routes/attendance')(deps));
 app.use('/api/archive', require('./routes/archive')(deps));

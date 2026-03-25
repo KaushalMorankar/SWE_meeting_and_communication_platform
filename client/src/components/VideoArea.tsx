@@ -12,7 +12,6 @@ import {
 import ShortcutTooltip from "./ShortcutTooltip";
 import Kbd from "./Kbd";
 import useWebRTC from "../hooks/useWebRTC";
-import useTranscriptionCapture from "../hooks/useTranscriptionCapture";
 import { useSocket } from "../context/SocketContext";
 
 const SERVER_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5001").replace(/\/api$/, "");
@@ -149,8 +148,6 @@ export default function VideoArea({
     toggleVideo,
     toggleScreenShare,
   } = useWebRTC(socket, meetingId, currentUser);
-
-  useTranscriptionCapture(socket, meetingId, localStream);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);

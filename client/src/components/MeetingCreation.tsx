@@ -29,18 +29,28 @@ interface Slot {
     display: string;
 }
 
+interface MeetingFormData {
+  title: string;
+  description?: string;
+  location?: string;
+  duration: number;
+  modality: 'Online' | 'Offline' | 'Hybrid';
+  timeSlots: Array<{ date: string; time: string }>;
+  agenda?: Array<{ title: string; duration: number }>;
+}
+
 interface ParticipantUser {
-    _id: string;
-    name: string;
-    email: string;
-    profileImage?: string;
+  _id: string;
+  name: string;
+  email: string;
+  profileImage?: string;
 }
 
 interface CreatedMeeting {
-    title: string;
-    date?: string;
-    time?: string;
-    meetingUrl?: string;
+  title: string;
+  date?: string;
+  time?: string;
+  meetingUrl?: string;
 }
 
 interface MeetingCreationProps {
@@ -164,22 +174,22 @@ function buildSuggestions(query: string): Suggestion[] {
 }
 
 export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationProps) {
-    const { user } = useAuth();
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [duration, setDuration] = useState(30);
-    const [agenda, setAgenda] = useState<Array<{ title: string; duration: number }>>([{ title: '', duration: 15 }]);
-    const [modality, setModality] = useState('Online');
-    const [location, setLocation] = useState('');
-    const [slots, setSlots] = useState<Slot[]>([]);
-    const [inputValue, setInputValue] = useState('');
-    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [highlightIdx, setHighlightIdx] = useState(0);
-    const [slotError, setSlotError] = useState(false);
-    const [labelText, setLabelText] = useState('Scheduling Poll Slots');
-    const [labelFading, setLabelFading] = useState(false);
-    const [closing, setClosing] = useState(false);
+  const { user } = useAuth();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
+  const [duration, setDuration] = useState<number>(30);
+  const [modality, setModality] = useState<'Online' | 'Offline' | 'Hybrid'>('Online');
+  const [agenda, setAgenda] = useState<Array<{ title: string; duration: number }>>([{ title: '', duration: 15 }]);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(0);
+  const [slotError, setSlotError] = useState(false);
+  const [labelText, setLabelText] = useState('Scheduling Poll Slots');
+  const [labelFading, setLabelFading] = useState(false);
+  const [closing, setClosing] = useState(false);
 
     const handleClose = useCallback(() => {
         if (closing) return;
@@ -385,41 +395,28 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
         if (!showDropdown) openDropdown();
     };
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const filledSlots = slots.filter(s => s.date);
-        if (filledSlots.length === 0) {
-            triggerSlotError();
-            inputRef.current?.focus();
-            return;
-        }
-        const meetingData = {
-            title,
-            description: description.trim() || undefined,
-            durationMinutes: duration,
-            modality,
-            location: (modality === 'Offline' || modality === 'Hybrid') ? location : undefined,
-            participants: participants.map(p => p._id),
-            agenda: agenda.filter(a => a.title.trim() !== '').map(a => ({ title: a.title.trim(), duration: a.duration })),
-            timeSlots: filledSlots.map(s => ({
-                date: s.date.toISOString().split('T')[0],
-                time: s.date.toTimeString().slice(0, 5),
-            })),
-        };
-        const result = await onSubmit(meetingData);
-        if (result) {
-            setCreatedMeeting(result);
-        }
-    };
-
-    const handleCopyLink = async () => {
-        if (!createdMeeting?.meetingUrl) return;
-        try {
-            await navigator.clipboard.writeText(createdMeeting.meetingUrl);
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2000);
-        } catch { /* fallback handled by UI */ }
-    };
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const filledSlots = slots.filter(s => s.date);
+    if (filledSlots.length === 0) {
+      triggerSlotError();
+      inputRef.current?.focus();
+      return;
+    }
+    onSubmit({
+      title,
+      description,
+      location,
+      duration,
+      modality,
+      agenda: agenda.filter(a => a.title.trim() !== ''),
+      timeSlots: filledSlots.map(s => ({
+        date: s.date.toISOString().split('T')[0],
+        time: s.date.toTimeString().slice(0, 5),
+      })),
+    });
+    onClose();
+  };
 
     const renderAvatar = (u: ParticipantUser, size = 10) => {
         if (u.profileImage) {
@@ -428,376 +425,318 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
         return <Icon icon={UserIcon} size={size} />;
     };
 
-    // Post-creation success view
-    if (createdMeeting) {
-        const hasMeetingLink = createdMeeting.meetingUrl && modality !== 'Offline';
-        const isPoll = slots.length > 1;
-        return (
-            <div className={`modal-overlay${closing ? ' modal-closing' : ''}`} onClick={handleClose}>
-                <div className={`modal-content${closing ? ' modal-content-closing' : ''}`} onClick={(e) => e.stopPropagation()}>
-                    <button className="btn-icon modal-close-btn" onClick={handleClose}>
-                        <Icon icon={Cancel01Icon} size={18} />
-                    </button>
-                    <div className="modal-header">
-                        <h2 className="modal-title">Meeting Created</h2>
-                    </div>
-
-                    <div className="meeting-created-body">
-                        <div className="meeting-created-icon">
-                            <Icon icon={Calendar02Icon} size={28} />
-                        </div>
-                        <h3 className="meeting-created-title">{createdMeeting.title}</h3>
-                        <span className={`chip ${modality === 'Online' ? 'chip-blue' : modality === 'Hybrid' ? 'chip-purple' : 'chip-emerald'}`}
-                            style={{ alignSelf: 'center' }}>{modality}</span>
-
-                        {isPoll && (
-                            <div className="meeting-created-info">
-                                A scheduling poll has been sent to {participants.length} participant{participants.length !== 1 ? 's' : ''}.
-                                The meeting will be confirmed once a majority votes.
-                            </div>
-                        )}
-
-                        {!isPoll && createdMeeting.date && (
-                            <div className="meeting-created-info">
-                                Confirmed for <strong>{createdMeeting.date}</strong> at <strong>{createdMeeting.time}</strong>.
-                                {participants.length > 0 && ` RSVP emails sent to ${participants.length} participant${participants.length !== 1 ? 's' : ''}.`}
-                            </div>
-                        )}
-
-                        {hasMeetingLink && (
-                            <div className="jitsi-link-card">
-                                <div className="jitsi-link-label">
-                                    <Icon icon={Link01Icon} size={14} />
-                                    Meeting Link
-                                </div>
-                                <div className="jitsi-link-row">
-                                    <span className="jitsi-link-url">{createdMeeting.meetingUrl}</span>
-                                    <button className={`btn btn-sm ${linkCopied ? 'btn-success' : 'btn-secondary'}`} onClick={handleCopyLink}>
-                                        <Icon icon={linkCopied ? Tick01Icon : Copy01Icon} size={14} />
-                                        {linkCopied ? 'Copied' : 'Copy'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {participants.length > 0 && (
-                            <div className="meeting-created-participants">
-                                <span className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>Participants</span>
-                                <div className="participant-chips">
-                                    {participants.map(p => (
-                                        <span key={p._id} className="participant-chip">
-                                            <span className="participant-chip-avatar">{renderAvatar(p)}</span>
-                                            {p.name}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                        <button className="btn btn-primary" onClick={handleClose}>Done</button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className={`modal-overlay${closing ? ' modal-closing' : ''}`} onClick={handleClose}>
             <div className={`modal-content${closing ? ' modal-content-closing' : ''}`} onClick={(e) => e.stopPropagation()}>
-                <button className="btn-icon modal-close-btn" onClick={handleClose}>
+                <button type="button" className="btn-icon modal-close-btn" onClick={handleClose}>
                     <Icon icon={Cancel01Icon} size={18} />
                 </button>
-                <div className="modal-header">
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+			<div className="modal-header">
                     <h2 className="modal-title">Create New Meeting</h2>
                 </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label className="form-label">Meeting Title</label>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{title.length}/100</span>
+            </div>
+            <input
+              type="text"
+              className="input"
+              placeholder="e.g., Sprint Planning — Q2 Review"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              id="input-meeting-title"
+              maxLength={100}
+            />
+          </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label className="form-label">Meeting Title</label>
-                        <input
-                            type="text"
-                            className="input"
-                            placeholder="e.g., Sprint Planning — Q2 Review"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            required
-                            autoFocus
-                            id="input-meeting-title"
-                        />
-                    </div>
+          <div className="form-group">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label className="form-label">Description (Optional)</label>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{description.length}/500</span>
+            </div>
+            <textarea
+              className="input"
+              placeholder="What is this meeting about?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              style={{ resize: 'vertical', fontFamily: 'inherit' }}
+              id="input-meeting-description"
+              maxLength={500}
+            />
+          </div>
 
-                    <div className="form-group">
-                        <label className="form-label">Description (optional)</label>
-                        <textarea
-                            className="input"
-                            placeholder="What is this meeting about?"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={3}
-                            style={{ resize: 'vertical', fontFamily: 'inherit' }}
-                            id="input-meeting-description"
-                        />
-                    </div>
+          <div className="form-group">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <label className="form-label">Agenda Items (Optional)</label>
+            </div>
 
-                    <div className="form-group">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                            <label className="form-label">Agenda items (optional)</label>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {agenda.map((item, index) => (
-                                <div key={index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                    <input
-                                        type="text"
-                                        className="input"
-                                        placeholder="e.g. Review Q3 OKRs"
-                                        value={item.title}
-                                        onChange={(e) => handleAgendaChange(index, 'title', e.target.value)}
-                                        style={{ flex: 1, marginTop: 0 }}
-                                    />
-                                    <div style={{ position: 'relative', width: '5.625rem' }}>
-                                        <input
-                                            type="number"
-                                            className="input"
-                                            placeholder="Mins"
-                                            value={item.duration}
-                                            onChange={(e) => handleAgendaChange(index, 'duration', Number(e.target.value))}
-                                            style={{ marginTop: 0, paddingRight: '1.75rem' }}
-                                        />
-                                        <span style={{ position: 'absolute', right: '0.625rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.75rem', color: 'var(--text-muted)', pointerEvents: 'none' }}>
-                                            min
-                                        </span>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="btn-icon"
-                                        onClick={() => removeAgendaItem(index)}
-                                        style={{ width: '2rem', height: '2rem', flexShrink: 0 }}
-                                    >
-                                        <Icon icon={Delete02Icon} size={16} />
-                                    </button>
-                                </div>
-                            ))}
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={addAgendaItem}
-                                style={{ width: 'fit-content', fontSize: '0.8125rem', padding: '0.25rem 0.75rem', marginTop: '0.25rem' }}
-                            >
-                                <Icon icon={Add01Icon} size={14} /> Add agenda item
-                            </button>
-                        </div>
-                    </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {agenda.map((item, index) => (
+                <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ flex: 1, position: 'relative' }}>
+                    <input
+                      type="text"
+                      className="input"
+                      placeholder={`e.g., Review Q3 OKRs`}
+                      value={item.title}
+                      onChange={(e) => handleAgendaChange(index, 'title', e.target.value)}
+                      style={{ marginTop: 0, width: '100%', paddingRight: '45px' }}
+                      maxLength={200}
+                    />
+                    <span style={{ position: 'absolute', right: '8px', bottom: '8px', fontSize: '10px', color: 'var(--text-tertiary)', pointerEvents: 'none' }}>
+                      {item.title.length}/200
+                    </span>
+                  </div>
+                  <div style={{ position: 'relative', width: '90px' }}>
+                    <input
+                      type="number"
+                      className="input"
+                      placeholder="Mins"
+                      value={item.duration}
+                      onChange={(e) => handleAgendaChange(index, 'duration', Number(e.target.value))}
+                      style={{ marginTop: 0, paddingRight: '28px' }}
+                    />
+                    <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'var(--text-tertiary)', pointerEvents: 'none' }}>
+                      min
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    onClick={() => removeAgendaItem(index)}
+                    style={{ width: '32px', height: '32px', flexShrink: 0 }}
+                  >
+                    <Icon icon={Delete02Icon} size={16} />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={addAgendaItem}
+                style={{ width: 'fit-content', fontSize: '12px', padding: '4px 12px', marginTop: '4px' }}
+              >
+                <Icon icon={Add01Icon} size={14} /> Add agenda item
+              </button>
+            </div>
+          </div>
 
-                    <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                        <label className="form-label">Meeting Modality</label>
-                        <div className="modality-options">
-                            {['Online', 'Offline', 'Hybrid'].map(m => (
-                                <button
-                                    key={m}
-                                    type="button"
-                                    className={`modality-btn ${modality === m ? 'active' : ''}`}
-                                    onClick={() => setModality(m)}
-                                    id={`modality-${m.toLowerCase()}`}
-                                >
-                                    {m === 'Online' && <Icon icon={Link01Icon} size={14} />}
-                                    {m === 'Offline' && <Icon icon={Location01Icon} size={14} />}
-                                    {m === 'Hybrid' && <><Icon icon={Link01Icon} size={14} /><Icon icon={Location01Icon} size={14} /></>}
-                                    {m}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+          <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+            <label className="form-label">Meeting Modality</label>
+            <div className="modality-options">
+              {(['Online', 'Offline', 'Hybrid'] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`modality-btn ${modality === m ? 'active' : ''}`}
+                  onClick={() => setModality(m)}
+                  id={`modality-${m.toLowerCase()}`}
+                >
+                  {m === 'Online' && <Icon icon={Link01Icon} size={14} />}
+                  {m === 'Offline' && <Icon icon={Location01Icon} size={14} />}
+                  {m === 'Hybrid' && <><Icon icon={Link01Icon} size={14} /><Icon icon={Location01Icon} size={14} /></>}
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                    {modality === 'Online' && (
-                        <div className="form-group" style={{ padding: '0', background: 'none', borderRadius: 'var(--radius-sm)', border: 'none' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
-                                <Icon icon={Link01Icon} size={14} />
-                                A video call room will be auto-created
-                            </div>
-                        </div>
-                    )}
+          {modality === 'Online' && (
+            <div className="form-group" style={{ padding: '0', background: 'none', borderRadius: 'var(--radius-sm)', border: 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
+                <Icon icon={Link01Icon} size={14} />
+                A video call room will be auto-created
+              </div>
+            </div>
+          )}
 
-                    {modality === 'Hybrid' && (
-                        <div className="form-group" style={{ padding: '0', background: 'none', borderRadius: 'var(--radius-sm)', border: 'none' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
-                                <Icon icon={Link01Icon} size={14} />
-                                A video call room will be auto-created
-                            </div>
-                        </div>
-                    )}
+          {modality === 'Hybrid' && (
+            <div className="form-group" style={{ padding: '0', background: 'none', borderRadius: 'var(--radius-sm)', border: 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
+                <Icon icon={Link01Icon} size={14} />
+                A video call room will be auto-created
+              </div>
+            </div>
+          )}
 
-                    {(modality === 'Offline' || modality === 'Hybrid') && (
-                        <div className="form-group">
-                            <label className="form-label">Physical Location</label>
-                            <input
-                                type="text"
-                                className="input"
-                                placeholder="e.g., Room 301, Academic Block A"
-                                value={location}
-                                onChange={(e) => setLocation(e.target.value)}
-                                id="input-location"
-                            />
-                        </div>
-                    )}
+          {(modality === 'Offline' || modality === 'Hybrid') && (
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="form-label">Physical Location</label>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{location.length}/200</span>
+              </div>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g., Room 301, Academic Block A"
+                id="input-location"
+                maxLength={200}
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              />
+            </div>
+          )}
 
-                    <div className="form-group">
-                        <label className="form-label">Duration (minutes)</label>
-                        <select
-                            className="input"
-                            value={duration}
-                            onChange={(e) => setDuration(Number(e.target.value))}
-                            id="input-meeting-duration"
-                        >
-                            <option value={15}>15 minutes</option>
-                            <option value={30}>30 minutes</option>
-                            <option value={45}>45 minutes</option>
-                            <option value={60}>1 hour</option>
-                            <option value={90}>1.5 hours</option>
-                            <option value={120}>2 hours</option>
-                        </select>
-                    </div>
+          <div className="form-group">
+            <label className="form-label">Duration (minutes)</label>
+            <select
+              className="input"
+              value={duration}
+              onChange={e => setDuration(Number(e.target.value))}
+              id="input-meeting-duration"
+            >
+              <option value={15}>15 minutes</option>
+              <option value={30}>30 minutes</option>
+              <option value={45}>45 minutes</option>
+              <option value={60}>1 hour</option>
+              <option value={90}>1.5 hours</option>
+              <option value={120}>2 hours</option>
+            </select>
+          </div>
 
-                    {/* Participant Picker */}
-                    <div className="form-group">
-                        <label className="form-label">Participants</label>
-                        <div className="participant-picker-wrapper">
-                            {participants.length > 0 && (
-                                <div className="participant-chips">
-                                    {participants.map(p => (
-                                        <span key={p._id} className="participant-chip removable">
-                                            <span className="participant-chip-avatar">{renderAvatar(p)}</span>
-                                            {p.name}
-                                            <button type="button" className="participant-chip-remove" onClick={() => removeParticipant(p._id)}>
-                                                <Icon icon={Cancel01Icon} size={10} />
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
-                            <div ref={participantRowRef} className="participant-search-row">
-                                <Icon icon={Search01Icon} size={14} className="nldate-icon" />
-                                <input
-                                    ref={participantInputRef}
-                                    type="text"
-                                    className="nldate-input"
-                                    placeholder="Search users by name or email..."
-                                    value={participantQuery}
-                                    onChange={(e) => setParticipantQuery(e.target.value)}
-                                    onFocus={() => fetchParticipantSuggestions(participantQuery)}
-                                    onBlur={() => setTimeout(() => setShowUserDropdown(false), 150)}
-                                    onKeyDown={handleParticipantKeyDown}
-                                    autoComplete="off"
-                                />
-                            </div>
-                        </div>
+          <div className="form-group">
+            <label className="form-label">Participants</label>
+            <div className="participant-picker-wrapper">
+              {participants.length > 0 && (
+                <div className="participant-chips">
+                  {participants.map(p => (
+                    <span key={p._id} className="participant-chip removable">
+                      <span className="participant-chip-avatar">{renderAvatar(p)}</span>
+                      {p.name}
+                      <button type="button" className="participant-chip-remove" onClick={() => removeParticipant(p._id)}>
+                        <Icon icon={Cancel01Icon} size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div ref={participantRowRef} className="participant-search-row">
+                <Icon icon={Search01Icon} size={14} className="nldate-icon" />
+                <input
+                  ref={participantInputRef}
+                  type="text"
+                  className="nldate-input"
+                  placeholder="Search users by name or email..."
+                  value={participantQuery}
+                  onChange={(e) => setParticipantQuery(e.target.value)}
+                  onFocus={() => fetchParticipantSuggestions(participantQuery)}
+                  onBlur={() => setTimeout(() => setShowUserDropdown(false), 150)}
+                  onKeyDown={handleParticipantKeyDown}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
 
-                        {showUserDropdown && userResults.length > 0 && createPortal(
-                            <div
-                                ref={participantDropdownRef}
-                                className="nldate-dropdown"
-                                style={{ top: participantDropdownPos.top, left: participantDropdownPos.left, width: participantDropdownPos.width }}
-                            >
-                                {userResults.map((u, i) => (
-                                    <button
-                                        key={u._id}
-                                        type="button"
-                                        className={`nldate-option${i === userHighlightIdx ? ' highlighted' : ''}`}
-                                        onMouseEnter={() => setUserHighlightIdx(i)}
-                                        onClick={() => addParticipant(u)}
-                                    >
-                                        <span className="nldate-option-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <span className="participant-chip-avatar">{renderAvatar(u, 12)}</span>
-                                            {u.name}
-                                        </span>
-                                        <span className="nldate-option-detail">{u.email}</span>
-                                    </button>
-                                ))}
-                            </div>,
-                            document.body
-                        )}
-                    </div>
+            {showUserDropdown && userResults.length > 0 && createPortal(
+              <div
+                ref={participantDropdownRef}
+                className="nldate-dropdown"
+                style={{ top: participantDropdownPos.top, left: participantDropdownPos.left, width: participantDropdownPos.width }}
+              >
+                {userResults.map((u, i) => (
+                  <button
+                    key={u._id}
+                    type="button"
+                    className={`nldate-option${i === userHighlightIdx ? ' highlighted' : ''}`}
+                    onMouseEnter={() => setUserHighlightIdx(i)}
+                    onClick={() => addParticipant(u)}
+                  >
+                    <span className="nldate-option-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className="participant-chip-avatar">{renderAvatar(u, 12)}</span>
+                      {u.name}
+                    </span>
+                    <span className="nldate-option-detail">{u.email}</span>
+                  </button>
+                ))}
+              </div>,
+              document.body
+            )}
+          </div>
 
-                    <div className="form-group">
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <label className={`form-label slot-label${labelFading ? ' fading' : ''}${slotError ? ' slot-label-error' : ''}`}>
-                                {labelText}
-                            </label>
-                        </div>
+          <div className="form-group">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label className={`form-label slot-label${labelFading ? ' fading' : ''}${slotError ? ' slot-label-error' : ''}`}>
+                {labelText}
+              </label>
+            </div>
 
-                        <div className="nldate-wrapper">
-                            <div ref={inputRowRef} className={`nldate-input-row${slotError ? ' nldate-error' : ''}`}>
-                                <Icon icon={Clock01Icon} size={14} className="nldate-icon" />
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    className="nldate-input"
-                                    placeholder="e.g., tomorrow at 2pm, next monday, 9 mar..."
-                                    value={inputValue}
-                                    onChange={handleInputChange}
-                                    onFocus={openDropdown}
-                                    onBlur={() => setTimeout(closeDropdown, 150)}
-                                    onKeyDown={handleKeyDown}
-                                    autoComplete="off"
-                                />
-                                {inputValue && (
-                                    <button type="button" className="nldate-clear" onClick={() => { setInputValue(''); inputRef.current?.focus(); }}>
-                                        <Icon icon={Cancel01Icon} size={12} />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+            <div className="nldate-wrapper">
+              <div ref={inputRowRef} className={`nldate-input-row${slotError ? ' nldate-error' : ''}`}>
+                <Icon icon={Clock01Icon} size={14} className="nldate-icon" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  className="nldate-input"
+                  placeholder="e.g., tomorrow at 2pm, next monday, 9 mar..."
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  onFocus={openDropdown}
+                  onBlur={() => setTimeout(closeDropdown, 150)}
+                  onKeyDown={handleKeyDown}
+                  autoComplete="off"
+                />
+                {inputValue && (
+                  <button type="button" className="nldate-clear" onClick={() => { setInputValue(''); inputRef.current?.focus(); }}>
+                    <Icon icon={Cancel01Icon} size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
 
-                        {showDropdown && suggestions.length > 0 && createPortal(
-                            <div
-                                ref={dropdownRef}
-                                className="nldate-dropdown"
-                                style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-                            >
-                                {suggestions.map((s, i) => (
-                                    <button
-                                        key={i}
-                                        type="button"
-                                        className={`nldate-option${i === highlightIdx ? ' highlighted' : ''}`}
-                                        onMouseEnter={() => setHighlightIdx(i)}
-                                        onClick={() => selectSuggestion(s)}
-                                    >
-                                        <span className="nldate-option-label">{s.label}</span>
-                                        <span className="nldate-option-detail">{s.detail}</span>
-                                    </button>
-                                ))}
-                            </div>,
-                            document.body
-                        )}
+            {showDropdown && suggestions.length > 0 && createPortal(
+              <div
+                ref={dropdownRef}
+                className="nldate-dropdown"
+                style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
+              >
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`nldate-option${i === highlightIdx ? ' highlighted' : ''}`}
+                    onMouseEnter={() => setHighlightIdx(i)}
+                    onClick={() => selectSuggestion(s)}
+                  >
+                    <span className="nldate-option-label">{s.label}</span>
+                    <span className="nldate-option-detail">{s.detail}</span>
+                  </button>
+                ))}
+              </div>,
+              document.body
+            )}
 
-                        {slots.map(slot => (
-                            <div key={slot.id} className="slot-row">
-                                <div className="slot-row-content">
-                                    <Icon icon={Calendar02Icon} size={14} className="slot-row-icon" />
-                                    <span>{slot.display}</span>
-                                </div>
-                                <button type="button" className="btn-icon" onClick={() => removeSlot(slot.id)} style={{ width: '1.25rem', height: '1.25rem' }}>
-                                    <Icon icon={Delete02Icon} size={14} />
-                                </button>
-                            </div>
-                        ))}
+            {slots.map(slot => (
+              <div key={slot.id} className="slot-row">
+                <div className="slot-row-content">
+                  <Icon icon={Calendar02Icon} size={14} className="slot-row-icon" />
+                  <span>{slot.display}</span>
+                </div>
+                <button type="button" className="btn-icon" onClick={() => removeSlot(slot.id)} style={{ width: '1.25rem', height: '1.25rem' }}>
+                  <Icon icon={Delete02Icon} size={14} />
+                </button>
+              </div>
+            ))}
 
-                        {slots.length > 1 && (
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                                Multiple slots — a poll will be sent to participants to vote.
-                            </div>
-                        )}
-                    </div>
+            {slots.length > 1 && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                Multiple slots — a poll will be sent to participants to vote.
+              </div>
+            )}
+          </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-                        <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
-                        <button type="submit" className="btn btn-primary" id="btn-create-meeting">
-                            <Icon icon={Calendar02Icon} size={16} />
-                            Create Meeting
-                        </button>
-                    </div>
-                </form>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" id="btn-create-meeting">
+              <Icon icon={Calendar02Icon} size={16} />
+              Create Meeting
+            </button>
+          </div>
+        </form>
+
 
                 <style>{`
           .modality-options {

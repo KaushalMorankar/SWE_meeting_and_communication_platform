@@ -305,6 +305,7 @@ export default function ProductivityDashboard({ stats, userName }: ProductivityD
           height: 100%;
           overflow-y: auto;
           padding-bottom: 1.5rem;
+          background: transparent;
         }
 
         .badges-grid {
@@ -317,14 +318,17 @@ export default function ProductivityDashboard({ stats, userName }: ProductivityD
           align-items: center;
           gap: 0.75rem;
           padding: 0.625rem 0.875rem;
-          background: var(--bg-elevated);
-          border: 0.0625rem solid var(--border);
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 0.0625rem solid rgba(255, 255, 255, 0.05);
           border-radius: var(--radius-sm);
-          transition: all 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .badge-item:hover {
-          background: var(--bg-hover);
-          border-color: var(--border-hover);
+          background: rgba(255, 255, 255, 0.08);
+          border-color: rgba(255, 255, 255, 0.15);
+          transform: translateY(-2px);
         }
         .badge-icon { font-size: 1.5rem; }
         .badge-name { font-size: 0.8125rem; font-weight: 600; }
@@ -368,9 +372,19 @@ export default function ProductivityDashboard({ stats, userName }: ProductivityD
         .engagement-circle span { position: relative; z-index: 1; }
         .recommendations { display: flex; flex-direction: column; gap: 0.75rem; }
         .recommendation-item {
-          display: flex; gap: 0.75rem; padding: 0.75rem;
-          background: var(--bg-elevated); border-radius: var(--radius-sm);
-          border: 0.0625rem solid var(--border);
+          display: flex;
+          gap: 0.75rem;
+          padding: 0.75rem;
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border-radius: var(--radius-sm);
+          border: 0.0625rem solid rgba(255, 255, 255, 0.05);
+          transition: all 0.3s ease;
+        }
+        .recommendation-item:hover {
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(255, 255, 255, 0.1);
         }
         .rec-emoji { font-size: 1.25rem; flex-shrink: 0; }
         .recommendation-item p {
