@@ -261,8 +261,8 @@ function DashboardApp() {
 					  <span className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}>
                         {meeting.status === "pending_poll" ? "Poll Open" : meeting.status}
                       </span>
-                      {meeting.date && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.date)}</span>}
-                      {meeting.time && <span><Icon icon={Clock01Icon} size={14} /> {meeting.time}</span>}
+                      {(meeting.confirmedDate || meeting.date) && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.confirmedDate || meeting.date)}</span>}
+                      {(meeting.confirmedTime || meeting.time) && <span><Icon icon={Clock01Icon} size={14} /> {meeting.confirmedTime || meeting.time}</span>}
                       <span><Icon icon={UserIcon} size={14} /> {meeting.host}</span>
                     </div>
                   </div>
@@ -349,8 +349,8 @@ function DashboardApp() {
 					<span className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}>
                         {meeting.status === "pending_poll" ? "Poll Open" : meeting.status}
                       </span>
-                    {meeting.date && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.date)}</span>}
-                    {meeting.time && <span><Icon icon={Clock01Icon} size={14} /> {meeting.time}</span>}
+                    {(meeting.confirmedDate || meeting.date) && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.confirmedDate || meeting.date)}</span>}
+                    {(meeting.confirmedTime || meeting.time) && <span><Icon icon={Clock01Icon} size={14} /> {meeting.confirmedTime || meeting.time}</span>}
                     <span><Icon icon={UserIcon} size={14} /> {meeting.host}</span>
                   </div>
                 </div>
