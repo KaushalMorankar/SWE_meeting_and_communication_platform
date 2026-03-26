@@ -12,6 +12,7 @@ import { useSocket } from '../context/SocketContext';
 export interface HostControlsProps {
     meetingId?: string;
     meetingTitle?: string;
+    modality?: string;
     audioEnabled: boolean;
     videoEnabled: boolean;
     screenSharing: boolean;
@@ -30,7 +31,7 @@ export interface HostControlsRef {
 }
 
 const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function HostControls({
-    meetingId, meetingTitle,
+    meetingId, meetingTitle, modality,
     audioEnabled, videoEnabled, screenSharing,
     onToggleAudio, onToggleVideo, onToggleScreenShare,
     onLeave, hasJoined, onMeetingEnded,
@@ -38,6 +39,8 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
     const { socket } = useSocket();
     const [showQR, setShowQR] = useState(false);
     const [copied, setCopied] = useState(false);
+
+    const isOffline = modality === 'Offline';
 
     useImperativeHandle(ref, () => ({
         toggleRecording: () => {},
@@ -68,44 +71,48 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
         <>
             <div className="host-controls">
                 <div className="controls-group">
-                    <ShortcutTooltip label={audioEnabled ? 'Mute' : 'Unmute'} keys={['M']} position="top">
-                        <button
-                            className={`btn-icon ${audioEnabled ? 'active' : ''}`}
-                            onClick={onToggleAudio}
-                            disabled={!hasJoined}
-                        >
-                            <Icon icon={audioEnabled ? Mic01Icon : MicOff01Icon} size={18} />
-                        </button>
-                    </ShortcutTooltip>
+                    {!isOffline && (
+                        <>
+                            <ShortcutTooltip label={audioEnabled ? 'Mute' : 'Unmute'} keys={['M']} position="top">
+                                <button
+                                    className={`btn-icon ${audioEnabled ? 'active' : ''}`}
+                                    onClick={onToggleAudio}
+                                    disabled={!hasJoined}
+                                >
+                                    <Icon icon={audioEnabled ? Mic01Icon : MicOff01Icon} size={18} />
+                                </button>
+                            </ShortcutTooltip>
 
-                    <ShortcutTooltip label={videoEnabled ? 'Turn off camera' : 'Turn on camera'} keys={['C']} position="top">
-                        <button
-                            className={`btn-icon ${videoEnabled ? 'active' : ''}`}
-                            onClick={onToggleVideo}
-                            disabled={!hasJoined}
-                        >
-                            <Icon icon={videoEnabled ? Video01Icon : VideoOffIcon} size={18} />
-                        </button>
-                    </ShortcutTooltip>
+                            <ShortcutTooltip label={videoEnabled ? 'Turn off camera' : 'Turn on camera'} keys={['C']} position="top">
+                                <button
+                                    className={`btn-icon ${videoEnabled ? 'active' : ''}`}
+                                    onClick={onToggleVideo}
+                                    disabled={!hasJoined}
+                                >
+                                    <Icon icon={videoEnabled ? Video01Icon : VideoOffIcon} size={18} />
+                                </button>
+                            </ShortcutTooltip>
 
-                    <ShortcutTooltip label={screenSharing ? 'Stop sharing' : 'Share screen'} position="top">
-                        <button
-                            className={`btn-icon ${screenSharing ? 'active' : ''}`}
-                            onClick={onToggleScreenShare}
-                            disabled={!hasJoined}
-                        >
-                            <Icon icon={ComputerScreenShareIcon} size={18} />
-                        </button>
-                    </ShortcutTooltip>
+                            <ShortcutTooltip label={screenSharing ? 'Stop sharing' : 'Share screen'} position="top">
+                                <button
+                                    className={`btn-icon ${screenSharing ? 'active' : ''}`}
+                                    onClick={onToggleScreenShare}
+                                    disabled={!hasJoined}
+                                >
+                                    <Icon icon={ComputerScreenShareIcon} size={18} />
+                                </button>
+                            </ShortcutTooltip>
 
-                    <div className="controls-divider"></div>
+                            <div className="controls-divider"></div>
 
-                    <ShortcutTooltip label="Live transcription is not available yet" position="top">
-                        <button type="button" className="control-btn" disabled style={{ opacity: 0.55, cursor: 'not-allowed' }}>
-                            <Icon icon={RecordIcon} size={16} />
-                            <span>Transcript</span>
-                        </button>
-                    </ShortcutTooltip>
+                            <ShortcutTooltip label="Live transcription is not available yet" position="top">
+                                <button type="button" className="control-btn" disabled style={{ opacity: 0.55, cursor: 'not-allowed' }}>
+                                    <Icon icon={RecordIcon} size={16} />
+                                    <span>Transcript</span>
+                                </button>
+                            </ShortcutTooltip>
+                        </>
+                    )}
 
                     <ShortcutTooltip label="Attendance" position="top">
                         <button className="control-btn" onClick={() => setShowQR(true)}>
@@ -114,10 +121,12 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
                         </button>
                     </ShortcutTooltip>
 
-                    <button className="control-btn" disabled>
-                        <Icon icon={UserGroupIcon} size={16} />
-                        <span>Participants</span>
-                    </button>
+                    {!isOffline && (
+                        <button className="control-btn" disabled>
+                            <Icon icon={UserGroupIcon} size={16} />
+                            <span>Participants</span>
+                        </button>
+                    )}
 
                     <button type="button" className="control-btn" onClick={handleCopyLink}>
                         <Icon icon={Link01Icon} size={16} />
@@ -126,7 +135,7 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px' }}>
-                    {hasJoined && (
+                    {(hasJoined || isOffline) && (
                         <>
                             <ShortcutTooltip label="End meeting" keys={['mod', 'Shift', 'E']} position="top">
                                 <button

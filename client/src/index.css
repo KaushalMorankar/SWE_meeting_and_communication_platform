@@ -831,6 +831,37 @@ input[type="date"].input-field {
   grid-template-columns: 1fr;
 }
 
+/* Offline Mode */
+.meeting-layout.offline-mode {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: var(--lk-size-xs);
+}
+
+.meeting-layout.offline-mode .video-area {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  height: auto;
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.meeting-layout.offline-mode .video-container {
+  display: none;
+}
+
+.meeting-layout.offline-mode .meeting-side-panel-left {
+  grid-column: 1;
+  grid-row: 2;
+  margin-right: 0;
+}
+
+.meeting-layout.offline-mode .meeting-side-panel-right {
+  grid-column: 2;
+  grid-row: 2;
+  margin-left: 0;
+}
+
 .meeting-layout .panel {
   height: 100%;
   overflow-y: auto;

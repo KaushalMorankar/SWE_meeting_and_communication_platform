@@ -326,6 +326,7 @@ export default function VideoArea({
         ref={hostControlsRef}
         meetingId={meetingId}
         meetingTitle={meetingTitle}
+        modality={modality}
         audioEnabled={audioEnabled}
         videoEnabled={videoEnabled}
         screenSharing={!!screenStream}

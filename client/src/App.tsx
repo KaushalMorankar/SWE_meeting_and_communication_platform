@@ -271,8 +271,9 @@ function DashboardApp() {
             </div>
           );
         }
+        const isOffline = selectedMeeting?.modality === 'Offline';
         return (
-          <div ref={meetingLayoutRef} className={`meeting-layout ${!agendaPanelOpen ? 'agenda-hidden' : ''} ${!rightPanelOpen ? 'right-hidden' : ''}`}>
+          <div ref={meetingLayoutRef} className={`meeting-layout ${isOffline ? 'offline-mode' : ''} ${!agendaPanelOpen ? 'agenda-hidden' : ''} ${!rightPanelOpen ? 'right-hidden' : ''}`}>
             {agendaPanelOpen && (
               <div className="meeting-side-panel meeting-side-panel-left open">
                 <AgendaPanel
