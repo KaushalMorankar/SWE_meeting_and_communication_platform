@@ -5,14 +5,15 @@ import Agenda = require('../models/Agenda');
 export = function ({ protect, usingMongo, inMemoryAgendas, io, Agenda: DbAgenda }: any) {
     const broadcastSync = async (meetingId: string) => {
         if (!io) return;
+        const mId = meetingId.toString();
         let items = [];
         if (usingMongo() && Agenda) {
-            const doc = await Agenda.findOne({ meetingId });
+            const doc = await Agenda.findOne({ meetingId: mId });
             items = doc ? (doc as any).items : [];
         } else {
-            items = inMemoryAgendas[meetingId] || [];
+            items = inMemoryAgendas[mId] || [];
         }
-        io.to(`meeting:${meetingId}`).emit('agenda_sync', { meetingId, items });
+        io.to(`meeting:${mId}`).emit('agenda_sync', { meetingId: mId, items });
     };
 
     router.get('/:meetingId', protect, async (req: any, res: any) => {

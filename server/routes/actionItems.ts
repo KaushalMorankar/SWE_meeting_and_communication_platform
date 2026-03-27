@@ -5,9 +5,10 @@ import ActionItem = require('../models/ActionItem');
 export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActionItems, io, ActionItem: DbActionItem }: any) {
     const broadcastSync = async (meetingId: string) => {
         if (!io) return;
+        const mId = meetingId.toString();
         let items = [];
         if (usingMongo() && ActionItem) {
-            const dbItems = await ActionItem.find({ meetingId }).populate('assignee', 'name email').sort({ createdAt: 1 });
+            const dbItems = await ActionItem.find({ meetingId: mId }).populate('assignee', 'name email').sort({ createdAt: 1 });
             items = dbItems.map((i: any) => ({
                 id: i._id.toString(), title: i.title,
                 assignee: i.assigneeName || i.assignee?.name || 'Unassigned',
@@ -19,7 +20,7 @@ export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActi
         } else {
             items = inMemoryActionItems[meetingId] || [];
         }
-        io.to(`meeting:${meetingId}`).emit('action_items_sync', { meetingId, items });
+        io.to(`meeting:${mId}`).emit('action_items_sync', { meetingId: mId, items });
     };
 
     router.get('/:meetingId', protect, async (req: any, res: any) => {

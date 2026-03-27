@@ -5,14 +5,15 @@ import Minutes = require('../models/Minutes');
 export = function ({ protect, usingMongo, inMemoryMinutes, io, Minutes: DbMinutes }: any) {
     const broadcastSync = async (meetingId: string) => {
         if (!io) return;
+        const mId = meetingId.toString();
         let items = [];
         if (usingMongo() && Minutes) {
-            const doc = await Minutes.findOne({ meetingId });
+            const doc = await Minutes.findOne({ meetingId: mId });
             items = doc ? (doc as any).items : [];
         } else {
-            items = inMemoryMinutes[meetingId] || [];
+            items = inMemoryMinutes[mId] || [];
         }
-        io.to(`meeting:${meetingId}`).emit('minutes_sync', { meetingId, items });
+        io.to(`meeting:${mId}`).emit('minutes_sync', { meetingId: mId, items });
     };
 
     router.get('/:meetingId', protect, async (req: any, res: any) => {

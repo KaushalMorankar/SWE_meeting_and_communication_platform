@@ -138,47 +138,41 @@ function DashboardApp() {
 
   useEffect(() => {
     if (!socket || !selectedMeeting) return;
-    const meetingId = selectedMeeting.id;
-    if (socket.connected) {
-      socket.emit('join_meeting', { meetingId });
-    }
+    const meetingId = (selectedMeeting.id || selectedMeeting._id)?.toString();
+    if (!meetingId) return;
 
-    const onConnect = () => {
-      socket.emit('join_meeting', { meetingId });
-    };
-    socket.on('connect', onConnect);
+    socket.emit('join_meeting', { meetingId });
 
     const handleAgendaSync = ({ meetingId: mid, items }: { meetingId: string; items: any[] }) => {
-      if (String(mid) === String(meetingId)) setAgendaItems(items);
+      if (mid?.toString() === meetingId) setAgendaItems(items);
     };
     const handleActionItemsSync = ({ meetingId: mid, items }: { meetingId: string; items: any[] }) => {
-      if (String(mid) === String(meetingId)) setActionItems(items);
+      if (mid?.toString() === meetingId) setActionItems(items);
     };
     const handleMinutesSync = ({ meetingId: mid, items }: { meetingId: string; items: any[] }) => {
-      if (String(mid) === String(meetingId)) {
+      if (mid?.toString() === meetingId) {
         const normalized = items.map((i) => ({ ...i, duration: typeof i.duration === "number" ? i.duration : 0 }));
         setMinutesItems(normalized);
       }
     };
-    const handleMeetingEnded = ({ meetingId: mid }: { meetingId: string }) => {
-      if (String(mid) === String(meetingId)) {
-        setMeetings(prev => prev.map(m => (String(m.id) === String(mid) ? { ...m, status: 'completed' } : m)));
-        setSelectedMeeting((prev: any) => prev && String(prev.id) === String(mid) ? { ...prev, status: 'completed' } : prev);
+    const handleMeetingEndedSync = ({ meetingId: mid }: { meetingId: string }) => {
+      if (mid?.toString() === meetingId) {
+        setMeetings(prev => prev.map(m => (String(m.id || m._id) === meetingId ? { ...m, status: 'completed' } : m)));
+        setSelectedMeeting((prev: any) => prev && String(prev.id || prev._id) === meetingId ? { ...prev, status: 'completed' } : prev);
       }
     };
 
     socket.on('agenda_sync', handleAgendaSync);
     socket.on('action_items_sync', handleActionItemsSync);
     socket.on('minutes_sync', handleMinutesSync);
-    socket.on('meeting_ended', handleMeetingEnded);
+    socket.on('meeting_ended', handleMeetingEndedSync);
 
     return () => {
-      socket.off('connect', onConnect);
       socket.emit('leave_meeting', { meetingId });
       socket.off('agenda_sync', handleAgendaSync);
       socket.off('action_items_sync', handleActionItemsSync);
       socket.off('minutes_sync', handleMinutesSync);
-      socket.off('meeting_ended', handleMeetingEnded);
+      socket.off('meeting_ended', handleMeetingEndedSync);
     };
   }, [socket, selectedMeeting]);
 
