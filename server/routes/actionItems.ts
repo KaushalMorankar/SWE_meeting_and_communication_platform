@@ -2,7 +2,25 @@ import express from 'express';
 const router = express.Router();
 import ActionItem = require('../models/ActionItem');
 
-export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActionItems }: any) {
+export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActionItems, io, ActionItem: DbActionItem }: any) {
+    const broadcastSync = async (meetingId: string) => {
+        if (!io) return;
+        let items = [];
+        if (usingMongo() && ActionItem) {
+            const dbItems = await ActionItem.find({ meetingId }).populate('assignee', 'name email').sort({ createdAt: 1 });
+            items = dbItems.map((i: any) => ({
+                id: i._id.toString(), title: i.title,
+                assignee: i.assigneeName || i.assignee?.name || 'Unassigned',
+                assigneeId: (i.assignee?._id || i.assignee)?.toString(),
+                category: i.category, status: i.status,
+                deadline: i.deadline, agendaItemId: i.agendaItemId,
+                source: i.source, aiConfidence: i.aiConfidence,
+            }));
+        } else {
+            items = inMemoryActionItems[meetingId] || [];
+        }
+        io.to(`meeting:${meetingId}`).emit('action_items_sync', { meetingId, items });
+    };
 
     router.get('/:meetingId', protect, async (req: any, res: any) => {
         try {
@@ -12,9 +30,9 @@ export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActi
                     .sort({ createdAt: 1 });
                 if (items.length) {
                     return res.json(items.map((i: any) => ({
-                        id: i._id, title: i.title,
+                        id: i._id.toString(), title: i.title,
                         assignee: i.assigneeName || i.assignee?.name || 'Unassigned',
-                        assigneeId: i.assignee?._id || i.assignee,
+                        assigneeId: (i.assignee?._id || i.assignee)?.toString(),
                         category: i.category, status: i.status,
                         deadline: i.deadline, agendaItemId: i.agendaItemId,
                         source: i.source, aiConfidence: i.aiConfidence,
@@ -39,6 +57,7 @@ export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActi
                 };
                 if (!inMemoryActionItems[req.params.meetingId]) inMemoryActionItems[req.params.meetingId] = [];
                 inMemoryActionItems[req.params.meetingId].push(item);
+                broadcastSync(req.params.meetingId);
                 return res.status(201).json(item);
             }
 
@@ -77,6 +96,7 @@ export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActi
                 deadline: item.deadline, agendaItemId: item.agendaItemId,
                 source: item.source, aiConfidence: item.aiConfidence,
             });
+            broadcastSync(req.params.meetingId);
         } catch (error: any) {
             res.status(500).json({ message: 'Server error', error: error.message });
         }
@@ -97,13 +117,14 @@ export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActi
             if (!item) return res.status(404).json({ message: 'Action item not found' });
 
             res.json({
-                id: item._id, title: item.title,
+                id: item._id.toString(), title: item.title,
                 assignee: (item as any).assigneeName || (item as any).assignee?.name || 'Unassigned',
-                assigneeId: (item as any).assignee?._id || item.assignee,
+                assigneeId: ((item as any).assignee?._id || item.assignee)?.toString(),
                 category: item.category, status: item.status,
                 deadline: (item as any).deadline, agendaItemId: (item as any).agendaItemId,
                 source: (item as any).source, aiConfidence: (item as any).aiConfidence,
             });
+            broadcastSync((item as any).meetingId.toString());
         } catch (error: any) {
             res.status(500).json({ message: 'Server error', error: error.message });
         }
@@ -112,7 +133,11 @@ export = function ({ protect, usingMongo, Notification, emitToUser, inMemoryActi
     router.delete('/:id', protect, async (req: any, res: any) => {
         try {
             if (!usingMongo()) return res.status(400).json({ message: 'Database required' });
+            const item = await ActionItem.findById(req.params.id);
+            if (!item) return res.status(404).json({ message: 'Not found' });
+            const meetingId = item.meetingId;
             await ActionItem.findByIdAndDelete(req.params.id);
+            broadcastSync(meetingId.toString());
             res.json({ message: 'Deleted' });
         } catch (error: any) {
             res.status(500).json({ message: 'Server error', error: error.message });

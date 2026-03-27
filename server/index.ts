@@ -209,7 +209,7 @@ const deps = {
     generateToken, emitToUser, sendRsvpEmail, generateICS,
     inMemoryUsers, JWT_SECRET, PORT, CLIENT_URL,
     inMemoryMeetings, inMemoryAgendas, inMemoryMinutes, inMemoryTranscripts, inMemoryActionItems,
-    callAISummarize,
+    callAISummarize, io,
 };
 
 // ── Mount Routes ─────────────────────────────────────────────

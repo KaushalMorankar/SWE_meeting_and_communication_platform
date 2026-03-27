@@ -21,6 +21,7 @@ export interface HostControlsProps {
     onToggleScreenShare: () => void;
     onLeave: () => void;
     hasJoined: boolean;
+    isHost?: boolean;
     onMeetingEnded?: () => void;
 }
 
@@ -34,7 +35,7 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
     meetingId, meetingTitle, modality,
     audioEnabled, videoEnabled, screenSharing,
     onToggleAudio, onToggleVideo, onToggleScreenShare,
-    onLeave, hasJoined, onMeetingEnded,
+    onLeave, hasJoined, isHost, onMeetingEnded,
 }, ref) {
     const { socket } = useSocket();
     const [showQR, setShowQR] = useState(false);
@@ -43,7 +44,7 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
     const isOffline = modality === 'Offline';
 
     useImperativeHandle(ref, () => ({
-        toggleRecording: () => {},
+        toggleRecording: () => { },
         showAttendance: () => setShowQR(true),
         endMeeting: () => {
             if (!socket || !meetingId) return;
@@ -137,16 +138,18 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
                 <div style={{ display: 'flex', gap: '6px' }}>
                     {(hasJoined || isOffline) && (
                         <>
-                            <ShortcutTooltip label="End meeting" keys={['mod', 'Shift', 'E']} position="top">
-                                <button
-                                    className="btn btn-danger"
-                                    onClick={handleEndMeeting}
-                                    style={{ fontSize: '12px', padding: '8px 16px' }}
-                                >
-                                    <Icon icon={StopIcon} size={14} />
-                                    <span style={{ marginLeft: '4px' }}>End</span>
-                                </button>
-                            </ShortcutTooltip>
+                            {isHost && (
+                                <ShortcutTooltip label="End meeting" keys={['mod', 'Shift', 'E']} position="top">
+                                    <button
+                                        className="btn btn-danger"
+                                        onClick={handleEndMeeting}
+                                        style={{ fontSize: '12px', padding: '8px 16px' }}
+                                    >
+                                        <Icon icon={StopIcon} size={14} />
+                                        <span style={{ marginLeft: '4px' }}>End</span>
+                                    </button>
+                                </ShortcutTooltip>
+                            )}
                             <ShortcutTooltip label="Leave" keys={['mod', 'Shift', 'L']} position="top">
                                 <button
                                     className="btn btn-secondary"

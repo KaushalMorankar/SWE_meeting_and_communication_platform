@@ -21,7 +21,8 @@ import Signup from "./pages/Signup";
 import { useAuth } from "./context/AuthContext";
 import { useSocket } from "./context/SocketContext";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
+const VITE_API_URL = import.meta.env.VITE_API_URL;
+const API_BASE = VITE_API_URL || "http://localhost:5001/api";
 
 const VIEW_KEYS = ['dashboard', 'meeting', 'schedule', 'archive', 'analytics', 'settings', 'profile'];
 
@@ -71,7 +72,7 @@ function DashboardApp() {
   const toggleFullscreen = useCallback(() => {
     const target = meetingLayoutRef.current;
     if (!target) return;
-    if (document.fullscreenElement) { document.exitFullscreen(); } else { target.requestFullscreen().catch(() => {}); }
+    if (document.fullscreenElement) { document.exitFullscreen(); } else { target.requestFullscreen().catch(() => { }); }
   }, []);
 
   const shortcuts = useMemo(() => [
@@ -138,24 +139,45 @@ function DashboardApp() {
   useEffect(() => {
     if (!socket || !selectedMeeting) return;
     const meetingId = selectedMeeting.id;
-    socket.emit('join_meeting', { meetingId });
+    if (socket.connected) {
+      socket.emit('join_meeting', { meetingId });
+    }
+
+    const onConnect = () => {
+      socket.emit('join_meeting', { meetingId });
+    };
+    socket.on('connect', onConnect);
 
     const handleAgendaSync = ({ meetingId: mid, items }: { meetingId: string; items: any[] }) => {
-      if (mid === meetingId) setAgendaItems(items);
+      if (String(mid) === String(meetingId)) setAgendaItems(items);
+    };
+    const handleActionItemsSync = ({ meetingId: mid, items }: { meetingId: string; items: any[] }) => {
+      if (String(mid) === String(meetingId)) setActionItems(items);
+    };
+    const handleMinutesSync = ({ meetingId: mid, items }: { meetingId: string; items: any[] }) => {
+      if (String(mid) === String(meetingId)) {
+        const normalized = items.map((i) => ({ ...i, duration: typeof i.duration === "number" ? i.duration : 0 }));
+        setMinutesItems(normalized);
+      }
     };
     const handleMeetingEnded = ({ meetingId: mid }: { meetingId: string }) => {
-      if (mid === meetingId) {
-        setMeetings(prev => prev.map(m => (m.id === mid ? { ...m, status: 'completed' } : m)));
-        setSelectedMeeting((prev: any) => prev && prev.id === mid ? { ...prev, status: 'completed' } : prev);
+      if (String(mid) === String(meetingId)) {
+        setMeetings(prev => prev.map(m => (String(m.id) === String(mid) ? { ...m, status: 'completed' } : m)));
+        setSelectedMeeting((prev: any) => prev && String(prev.id) === String(mid) ? { ...prev, status: 'completed' } : prev);
       }
     };
 
     socket.on('agenda_sync', handleAgendaSync);
+    socket.on('action_items_sync', handleActionItemsSync);
+    socket.on('minutes_sync', handleMinutesSync);
     socket.on('meeting_ended', handleMeetingEnded);
 
     return () => {
+      socket.off('connect', onConnect);
       socket.emit('leave_meeting', { meetingId });
       socket.off('agenda_sync', handleAgendaSync);
+      socket.off('action_items_sync', handleActionItemsSync);
+      socket.off('minutes_sync', handleMinutesSync);
       socket.off('meeting_ended', handleMeetingEnded);
     };
   }, [socket, selectedMeeting]);
@@ -232,6 +254,15 @@ function DashboardApp() {
     } catch (err) { console.error("Failed to save minutes:", err); }
   };
 
+  const handleAgendaChange = async (items: any[]) => {
+    setAgendaItems(items);
+    const mid = selectedMeeting?.id;
+    if (!mid) return;
+    try {
+      await fetchWithAuth(`${API_BASE}/agenda/${mid}`, { method: "POST", body: JSON.stringify({ items }) });
+    } catch (err) { console.error("Failed to save agenda:", err); }
+  };
+
   const renderContent = () => {
     switch (currentView) {
       case "dashboard":
@@ -258,7 +289,7 @@ function DashboardApp() {
                     <div className="meeting-card-title">{meeting.title}</div>
                     <div className="meeting-card-meta">
                       <span className={`chip ${meeting.modality === "Online" ? "chip-blue" : meeting.modality === "Hybrid" ? "chip-purple" : "chip-emerald"}`}>{meeting.modality}</span>
-					  <span className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}>
+                      <span className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}>
                         {meeting.status === "pending_poll" ? "Poll Open" : meeting.status}
                       </span>
                       {(meeting.confirmedDate || meeting.date) && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.confirmedDate || meeting.date)}</span>}
@@ -278,7 +309,7 @@ function DashboardApp() {
               <div className="meeting-side-panel meeting-side-panel-left open">
                 <AgendaPanel
                   agendaItems={agendaItems}
-                  onItemChange={setAgendaItems}
+                  onItemChange={handleAgendaChange}
                 />
                 <RubricSidebar
                   meetingId={selectedMeeting.id}
@@ -292,6 +323,7 @@ function DashboardApp() {
               meetingTitle={selectedMeeting?.title || "Select a Meeting"}
               participants={selectedMeeting?.participants || []}
               modality={selectedMeeting?.modality}
+              hostId={selectedMeeting?.hostId || null}
               currentUser={user}
               fullscreenRef={meetingLayoutRef}
               agendaPanelOpen={agendaPanelOpen}
@@ -331,8 +363,8 @@ function DashboardApp() {
         return (
           <div style={{ flex: 1, overflow: "auto" }}>
             <div className="page-header">
-				<h2 style={{ fontSize: 'var(--font-size-title3)', fontWeight: 600, marginBottom: 'var(--lk-size-2xs)', letterSpacing: '-0.022em' }}>Scheduled Meetings</h2>
-			</div>
+              <h2 style={{ fontSize: 'var(--font-size-title3)', fontWeight: 600, marginBottom: 'var(--lk-size-2xs)', letterSpacing: '-0.022em' }}>Scheduled Meetings</h2>
+            </div>
             <div className="meeting-list">
               {meetings.map(meeting => (
                 <div
@@ -347,9 +379,9 @@ function DashboardApp() {
                   <div className="meeting-card-title">{meeting.title}</div>
                   <div className="meeting-card-meta">
                     <span className={`chip ${meeting.modality === "Online" ? "chip-blue" : meeting.modality === "Hybrid" ? "chip-purple" : "chip-emerald"}`}>{meeting.modality}</span>
-					<span className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}>
-                        {meeting.status === "pending_poll" ? "Poll Open" : meeting.status}
-                      </span>
+                    <span className={`chip ${meeting.status === "completed" ? "chip-emerald" : meeting.status === "pending_poll" ? "chip-blue" : "chip-amber"}`}>
+                      {meeting.status === "pending_poll" ? "Poll Open" : meeting.status}
+                    </span>
                     {(meeting.confirmedDate || meeting.date) && <span><Icon icon={Calendar02Icon} size={14} /> {formatDate(meeting.confirmedDate || meeting.date)}</span>}
                     {(meeting.confirmedTime || meeting.time) && <span><Icon icon={Clock01Icon} size={14} /> {meeting.confirmedTime || meeting.time}</span>}
                     <span><Icon icon={UserIcon} size={14} /> {meeting.host}</span>

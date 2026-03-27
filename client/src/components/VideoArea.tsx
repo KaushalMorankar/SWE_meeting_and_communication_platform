@@ -32,7 +32,8 @@ interface VideoAreaProps {
   meetingTitle?: string;
   participants?: Array<{ _id?: string; id?: string; name?: string; profileImage?: string | null }>;
   modality?: string;
-  currentUser?: { _id?: string; name?: string; profileImage?: string | null } | null;
+  currentUser?: { _id?: string; id?: string; name?: string; profileImage?: string | null } | null;
+  hostId?: string | null;
   fullscreenRef?: React.RefObject<HTMLDivElement | null>;
   agendaPanelOpen: boolean;
   rightPanelOpen: boolean;
@@ -124,6 +125,7 @@ export default function VideoArea({
   meetingTitle,
   participants,
   modality,
+  hostId,
   currentUser,
   fullscreenRef,
   agendaPanelOpen,
@@ -204,7 +206,7 @@ export default function VideoArea({
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
-      target.requestFullscreen().catch(() => {});
+      target.requestFullscreen().catch(() => { });
     }
   }, [fullscreenRef]);
 
@@ -292,31 +294,31 @@ export default function VideoArea({
             </div>
           ) : (
             <>
-            {mediaError && (
-              <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: '0.375rem', marginBottom: '0.375rem', textAlign: 'center' }}>
-                {mediaError}
-              </div>
-            )}
-            <div className={`video-grid ${gridClass}`}>
-              <VideoTile
-                stream={screenStream || localStream}
-                name={currentUser?.name}
-                profileImage={currentUser?.profileImage}
-                muted={true}
-                isSelf={true}
-                isScreenShare={!!screenStream}
-              />
-              {peers.map((peer) => (
+              {mediaError && (
+                <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', color: '#f59e0b', background: 'rgba(245,158,11,0.1)', borderRadius: '0.375rem', marginBottom: '0.375rem', textAlign: 'center' }}>
+                  {mediaError}
+                </div>
+              )}
+              <div className={`video-grid ${gridClass}`}>
                 <VideoTile
-                  key={peer.socketId}
-                  stream={peer.stream}
-                  name={peer.name}
-                  profileImage={peer.profileImage}
-                  muted={false}
-                  isSelf={false}
+                  stream={screenStream || localStream}
+                  name={currentUser?.name}
+                  profileImage={currentUser?.profileImage}
+                  muted={true}
+                  isSelf={true}
+                  isScreenShare={!!screenStream}
                 />
-              ))}
-            </div>
+                {peers.map((peer) => (
+                  <VideoTile
+                    key={peer.socketId}
+                    stream={peer.stream}
+                    name={peer.name}
+                    profileImage={peer.profileImage}
+                    muted={false}
+                    isSelf={false}
+                  />
+                ))}
+              </div>
             </>
           )}
         </div>
@@ -335,6 +337,7 @@ export default function VideoArea({
         onToggleScreenShare={toggleScreenShare}
         onLeave={handleLeave}
         hasJoined={hasJoined}
+        isHost={currentUser ? (currentUser._id === hostId || currentUser.id === hostId) : false}
         onMeetingEnded={onMeetingEnded}
       />
 

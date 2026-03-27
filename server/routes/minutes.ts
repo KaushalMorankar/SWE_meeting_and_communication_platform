@@ -2,7 +2,18 @@ import express from 'express';
 const router = express.Router();
 import Minutes = require('../models/Minutes');
 
-export = function ({ protect, usingMongo, inMemoryMinutes }: any) {
+export = function ({ protect, usingMongo, inMemoryMinutes, io, Minutes: DbMinutes }: any) {
+    const broadcastSync = async (meetingId: string) => {
+        if (!io) return;
+        let items = [];
+        if (usingMongo() && Minutes) {
+            const doc = await Minutes.findOne({ meetingId });
+            items = doc ? (doc as any).items : [];
+        } else {
+            items = inMemoryMinutes[meetingId] || [];
+        }
+        io.to(`meeting:${meetingId}`).emit('minutes_sync', { meetingId, items });
+    };
 
     router.get('/:meetingId', protect, async (req: any, res: any) => {
         try {
@@ -21,6 +32,7 @@ export = function ({ protect, usingMongo, inMemoryMinutes }: any) {
             if (!usingMongo()) {
                 const { items } = req.body;
                 inMemoryMinutes[req.params.meetingId] = items || [];
+                broadcastSync(req.params.meetingId);
                 return res.json(items || []);
             }
 
@@ -30,6 +42,7 @@ export = function ({ protect, usingMongo, inMemoryMinutes }: any) {
                 { meetingId: req.params.meetingId, items: items || [], createdBy: req.user.id },
                 { upsert: true, new: true }
             );
+            broadcastSync(req.params.meetingId);
             res.json((doc as any).items);
         } catch (error: any) {
             res.status(500).json({ message: 'Server error', error: error.message });
@@ -52,6 +65,7 @@ export = function ({ protect, usingMongo, inMemoryMinutes }: any) {
                 if (!inMemoryMinutes[req.params.meetingId]) inMemoryMinutes[req.params.meetingId] = [];
                 newItem.order = inMemoryMinutes[req.params.meetingId].length;
                 inMemoryMinutes[req.params.meetingId].push(newItem);
+                broadcastSync(req.params.meetingId);
                 return res.status(201).json(newItem);
             }
 
@@ -62,6 +76,7 @@ export = function ({ protect, usingMongo, inMemoryMinutes }: any) {
             newItem.order = (doc as any).items.length;
             (doc as any).items.push(newItem);
             await doc.save();
+            broadcastSync(req.params.meetingId);
             res.status(201).json(newItem);
         } catch (error: any) {
             res.status(500).json({ message: 'Server error', error: error.message });
@@ -81,6 +96,7 @@ export = function ({ protect, usingMongo, inMemoryMinutes }: any) {
                 if (notes !== undefined) item.notes = notes;
                 if (title !== undefined) item.title = title;
                 if (duration !== undefined) item.duration = duration;
+                broadcastSync(req.params.meetingId);
                 return res.json(item);
             }
 
@@ -98,6 +114,7 @@ export = function ({ protect, usingMongo, inMemoryMinutes }: any) {
             if (status === 'completed') item.completedAt = new Date();
 
             await doc.save();
+            broadcastSync(req.params.meetingId);
             res.json(item);
         } catch (error: any) {
             res.status(500).json({ message: 'Server error', error: error.message });
