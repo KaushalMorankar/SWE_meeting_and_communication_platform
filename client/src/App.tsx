@@ -158,7 +158,11 @@ function DashboardApp() {
     const handleMeetingEndedSync = ({ meetingId: mid }: { meetingId: string }) => {
       if (mid?.toString() === meetingId) {
         setMeetings(prev => prev.map(m => (String(m.id || m._id) === meetingId ? { ...m, status: 'completed' } : m)));
-        setSelectedMeeting((prev: any) => prev && String(prev.id || prev._id) === meetingId ? { ...prev, status: 'completed' } : prev);
+        if (selectedMeeting && String(selectedMeeting.id || selectedMeeting._id) === meetingId) {
+          setSelectedMeeting(null);
+          setCurrentView('dashboard');
+        }
+        fetchMeetings();
       }
     };
 
@@ -233,8 +237,11 @@ function DashboardApp() {
 
   const handleMeetingEnded = () => {
     if (selectedMeeting) {
-      setMeetings(prev => prev.map(m => (m.id === selectedMeeting.id ? { ...m, status: 'completed' } : m)));
-      setSelectedMeeting(prev => prev ? { ...prev, status: 'completed' } : prev);
+      const mid = selectedMeeting.id || selectedMeeting._id;
+      setMeetings(prev => prev.map(m => (String(m.id || m._id) === String(mid) ? { ...m, status: 'completed' } : m)));
+      setSelectedMeeting(null);
+      setCurrentView('dashboard');
+      fetchMeetings();
     }
   };
 
@@ -275,7 +282,7 @@ function DashboardApp() {
                 Select a meeting below to join the call and see agenda, minutes, and action items.
               </p>
               <div className="meeting-list">
-                {meetings.map(meeting => (
+                {meetings.filter(m => m.status !== 'completed').map(meeting => (
                   <div key={meeting.id} className="meeting-card glass-card" onClick={() => setSelectedMeeting(meeting)}>
                     {meeting.status === "pending_poll" && meeting.pollId && (
                       <button className="btn btn-sm btn-primary" style={{ position: 'absolute', top: 'var(--lk-size-md)', right: 'var(--lk-size-md)' }} onClick={(e) => { e.stopPropagation(); setPollMeetingId(meeting.id); }}>Vote</button>
@@ -327,6 +334,12 @@ function DashboardApp() {
               onMeetingEnded={handleMeetingEnded}
               onTriggerAddActionItem={triggerAddActionItem}
               onTriggerAddAgendaItem={triggerAddAgendaItem}
+              agendaItems={agendaItems}
+              minutesItems={minutesItems}
+              actionItems={actionItems}
+              onAgendaChange={handleAgendaChange}
+              onMinutesChange={handleMinutesChange}
+              onRefreshActionItems={() => fetchActionItems(selectedMeeting.id)}
             />
             {rightPanelOpen && (
               <div className="meeting-side-panel meeting-side-panel-right open">
@@ -360,7 +373,7 @@ function DashboardApp() {
               <h2 style={{ fontSize: 'var(--font-size-title3)', fontWeight: 600, marginBottom: 'var(--lk-size-2xs)', letterSpacing: '-0.022em' }}>Scheduled Meetings</h2>
             </div>
             <div className="meeting-list">
-              {meetings.map(meeting => (
+              {meetings.filter(m => m.status !== 'completed').map(meeting => (
                 <div
                   key={meeting.id}
                   className={`meeting-card glass-card ${selectedMeeting?.id === meeting.id ? "selected" : ""}`}

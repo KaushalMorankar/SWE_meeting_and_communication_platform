@@ -47,15 +47,17 @@ const HostControls = forwardRef<HostControlsRef, HostControlsProps>(function Hos
         toggleRecording: () => { },
         showAttendance: () => setShowQR(true),
         endMeeting: () => {
-            if (!socket || !meetingId) return;
-            socket.emit('end_meeting', { meetingId });
+            if (socket && meetingId) {
+                socket.emit('end_meeting', { meetingId });
+            }
             onMeetingEnded?.();
         },
     }), [socket, meetingId, onMeetingEnded]);
 
     const handleEndMeeting = useCallback(() => {
-        if (!socket || !meetingId) return;
-        socket.emit('end_meeting', { meetingId });
+        if (socket && meetingId) {
+            socket.emit('end_meeting', { meetingId });
+        }
         onMeetingEnded?.();
     }, [socket, meetingId, onMeetingEnded]);
 

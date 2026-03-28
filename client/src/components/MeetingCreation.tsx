@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import Icon from './Icon';
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import Icon from "./Icon";
 import {
   Cancel01Icon,
   Calendar02Icon,
@@ -13,20 +13,20 @@ import {
   Copy01Icon,
   Tick01Icon,
   Add01Icon,
-} from '@hugeicons/core-free-icons';
-import * as chrono from 'chrono-node';
-import { useAuth } from '../context/AuthContext';
+} from "@hugeicons/core-free-icons";
+import * as chrono from "chrono-node";
+import { useAuth } from "../context/AuthContext";
 
 interface Suggestion {
-    label: string;
-    detail: string;
-    date: Date;
+  label: string;
+  detail: string;
+  date: Date;
 }
 
 interface Slot {
-    id: number;
-    date: Date;
-    display: string;
+  id: number;
+  date: Date;
+  display: string;
 }
 
 interface MeetingFormData {
@@ -34,7 +34,7 @@ interface MeetingFormData {
   description?: string;
   location?: string;
   duration: number;
-  modality: 'Online' | 'Offline' | 'Hybrid';
+  modality: "Online" | "Offline" | "Hybrid";
   timeSlots: Array<{ date: string; time: string }>;
   agenda?: Array<{ title: string; duration: number }>;
 }
@@ -54,350 +54,455 @@ interface CreatedMeeting {
 }
 
 interface MeetingCreationProps {
-    onClose: () => void;
-    onSubmit: (data: any) => Promise<any>;
+  onClose: () => void;
+  onSubmit: (data: any) => Promise<any>;
 }
 
-const _raw = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-const API_BASE = _raw.endsWith('/api') ? _raw : `${_raw}/api`;
-const SERVER_BASE = API_BASE.replace(/\/api$/, '');
+const _raw = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
+const API_BASE = _raw.endsWith("/api") ? _raw : `${_raw}/api`;
+const SERVER_BASE = API_BASE.replace(/\/api$/, "");
 
 function formatSlotDisplay(date: Date): string {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const isToday = date.toDateString() === now.toDateString();
-    const isTomorrow = date.toDateString() === tomorrow.toDateString();
+  const isToday = date.toDateString() === now.toDateString();
+  const isTomorrow = date.toDateString() === tomorrow.toDateString();
 
-    const dayLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
-    const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0;
-    const timeStr = hasTime ? ` at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : '';
+  const dayLabel = isToday
+    ? "Today"
+    : isTomorrow
+      ? "Tomorrow"
+      : date.toLocaleDateString("en-US", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        });
+  const hasTime = date.getHours() !== 0 || date.getMinutes() !== 0;
+  const timeStr = hasTime
+    ? ` at ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`
+    : "";
 
-    return `${dayLabel}${timeStr}`;
+  return `${dayLabel}${timeStr}`;
 }
 
 function buildSuggestions(query: string): Suggestion[] {
-    const now = new Date();
-    const trimmed = query.trim().toLowerCase();
+  const now = new Date();
+  const trimmed = query.trim().toLowerCase();
 
-    if (!trimmed) {
-        const suggestions = [];
-        suggestions.push({
-            label: 'Now',
-            detail: `${now.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })} at ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`,
-            date: new Date(now),
-        });
-        suggestions.push({
-            label: 'Today',
-            detail: now.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }),
-            date: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0),
-        });
-        const tom = new Date(now);
-        tom.setDate(tom.getDate() + 1);
-        suggestions.push({
-            label: 'Tomorrow',
-            detail: tom.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }),
-            date: new Date(tom.getFullYear(), tom.getMonth(), tom.getDate(), 0, 0, 0),
-        });
-        return suggestions;
+  if (!trimmed) {
+    const suggestions = [];
+    suggestions.push({
+      label: "Now",
+      detail: `${now.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" })} at ${now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`,
+      date: new Date(now),
+    });
+    suggestions.push({
+      label: "Today",
+      detail: now.toLocaleDateString("en-US", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      }),
+      date: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0),
+    });
+    const tom = new Date(now);
+    tom.setDate(tom.getDate() + 1);
+    suggestions.push({
+      label: "Tomorrow",
+      detail: tom.toLocaleDateString("en-US", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      }),
+      date: new Date(tom.getFullYear(), tom.getMonth(), tom.getDate(), 0, 0, 0),
+    });
+    return suggestions;
+  }
+
+  const parsed = chrono.parse(query, now, { forwardDate: true });
+  const results = [];
+  const seen = new Set();
+
+  for (const result of parsed) {
+    const d = result.start.date();
+    const key = d.toISOString();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const hasTime = result.start.isCertain("hour");
+    const timeStr = hasTime
+      ? ` at ${d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`
+      : "";
+    const datePart = d.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "long",
+    });
+    results.push({
+      label: datePart,
+      detail: `${d.toLocaleDateString("en-US", { weekday: "short" })}${timeStr}`,
+      date: d,
+    });
+  }
+
+  if (results.length === 0) {
+    const dayNames = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const dayAbbrevs = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+    let matchedDay = -1;
+    for (let i = 0; i < 7; i++) {
+      if (
+        dayNames[i].startsWith(trimmed) ||
+        dayAbbrevs[i].startsWith(trimmed)
+      ) {
+        matchedDay = i;
+        break;
+      }
     }
-
-    const parsed = chrono.parse(query, now, { forwardDate: true });
-    const results = [];
-    const seen = new Set();
-
-    for (const result of parsed) {
-        const d = result.start.date();
-        const key = d.toISOString();
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        const hasTime = result.start.isCertain('hour');
-        const timeStr = hasTime ? ` at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}` : '';
-        const datePart = d.toLocaleDateString('en-US', { day: 'numeric', month: 'long' });
+    if (matchedDay >= 0) {
+      for (let weekOffset = 0; weekOffset < 3; weekOffset++) {
+        const target = new Date(now);
+        let diff = matchedDay - now.getDay();
+        if (diff <= 0) diff += 7;
+        target.setDate(target.getDate() + diff + weekOffset * 7);
+        target.setHours(0, 0, 0, 0);
+        const weekLabel =
+          weekOffset === 0
+            ? target.toLocaleDateString("en-US", { weekday: "long" })
+            : `${target.toLocaleDateString("en-US", { weekday: "long" })} in ${weekOffset === 1 ? "one" : "two"} week${weekOffset > 1 ? "s" : ""}`;
         results.push({
-            label: datePart,
-            detail: `${d.toLocaleDateString('en-US', { weekday: 'short' })}${timeStr}`,
-            date: d,
+          label: weekLabel,
+          detail: target.toLocaleDateString("en-US", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+          }),
+          date: target,
         });
+      }
     }
+  }
 
-    if (results.length === 0) {
-        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        const dayAbbrevs = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-        let matchedDay = -1;
-        for (let i = 0; i < 7; i++) {
-            if (dayNames[i].startsWith(trimmed) || dayAbbrevs[i].startsWith(trimmed)) {
-                matchedDay = i;
-                break;
-            }
+  if (results.length > 0) {
+    const relExpressions = ["in 2 weeks", "in 1 month", "next week"];
+    for (const expr of relExpressions) {
+      if (expr.includes(trimmed) && expr !== trimmed) {
+        const rel = chrono.parseDate(expr, now, { forwardDate: true });
+        if (rel) {
+          const key = rel.toISOString();
+          if (!seen.has(key)) {
+            seen.add(key);
+            results.push({
+              label: expr.charAt(0).toUpperCase() + expr.slice(1),
+              detail: rel.toLocaleDateString("en-US", {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+              }),
+              date: rel,
+            });
+          }
         }
-        if (matchedDay >= 0) {
-            for (let weekOffset = 0; weekOffset < 3; weekOffset++) {
-                const target = new Date(now);
-                let diff = matchedDay - now.getDay();
-                if (diff <= 0) diff += 7;
-                target.setDate(target.getDate() + diff + weekOffset * 7);
-                target.setHours(0, 0, 0, 0);
-                const weekLabel = weekOffset === 0 ? target.toLocaleDateString('en-US', { weekday: 'long' }) : `${target.toLocaleDateString('en-US', { weekday: 'long' })} in ${weekOffset === 1 ? 'one' : 'two'} week${weekOffset > 1 ? 's' : ''}`;
-                results.push({
-                    label: weekLabel,
-                    detail: target.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }),
-                    date: target,
-                });
-            }
-        }
+      }
     }
+  }
 
-    if (results.length > 0) {
-        const relExpressions = ['in 2 weeks', 'in 1 month', 'next week'];
-        for (const expr of relExpressions) {
-            if (expr.includes(trimmed) && expr !== trimmed) {
-                const rel = chrono.parseDate(expr, now, { forwardDate: true });
-                if (rel) {
-                    const key = rel.toISOString();
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        results.push({
-                            label: expr.charAt(0).toUpperCase() + expr.slice(1),
-                            detail: rel.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }),
-                            date: rel,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    return results.slice(0, 6);
+  return results.slice(0, 6);
 }
 
-export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationProps) {
+export default function MeetingCreation({
+  onClose,
+  onSubmit,
+}: MeetingCreationProps) {
   const { user } = useAuth();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
   const [duration, setDuration] = useState<number>(30);
-  const [modality, setModality] = useState<'Online' | 'Offline' | 'Hybrid'>('Online');
-  const [agenda, setAgenda] = useState<Array<{ title: string; duration: number }>>([{ title: '', duration: 15 }]);
+  const [modality, setModality] = useState<"Online" | "Offline" | "Hybrid">(
+    "Online",
+  );
+  const [agenda, setAgenda] = useState<
+    Array<{ title: string; duration: number }>
+  >([{ title: "", duration: 15 }]);
   const [slots, setSlots] = useState<Slot[]>([]);
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(0);
   const [slotError, setSlotError] = useState(false);
-  const [labelText, setLabelText] = useState('Scheduling Poll Slots');
+  const [labelText, setLabelText] = useState("Scheduling Poll Slots");
   const [labelFading, setLabelFading] = useState(false);
   const [closing, setClosing] = useState(false);
 
-    const handleClose = useCallback(() => {
-        if (closing) return;
-        setClosing(true);
-        setTimeout(() => onClose(), 300);
-    }, [closing, onClose]);
+  const handleClose = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    setTimeout(() => onClose(), 300);
+  }, [closing, onClose]);
 
-    // Participant picker state
-    const [participants, setParticipants] = useState<ParticipantUser[]>([]);
-    const [participantQuery, setParticipantQuery] = useState('');
-    const [userResults, setUserResults] = useState<ParticipantUser[]>([]);
-    const [showUserDropdown, setShowUserDropdown] = useState(false);
-    const [userHighlightIdx, setUserHighlightIdx] = useState(0);
-    const participantInputRef = useRef<HTMLInputElement | null>(null);
-    const participantDropdownRef = useRef<HTMLDivElement | null>(null);
-    const participantRowRef = useRef<HTMLDivElement | null>(null);
-    const [participantDropdownPos, setParticipantDropdownPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+  // Participant picker state
+  const [participants, setParticipants] = useState<ParticipantUser[]>([]);
+  const [participantQuery, setParticipantQuery] = useState("");
+  const [userResults, setUserResults] = useState<ParticipantUser[]>([]);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [userHighlightIdx, setUserHighlightIdx] = useState(0);
+  const participantInputRef = useRef<HTMLInputElement | null>(null);
+  const participantDropdownRef = useRef<HTMLDivElement | null>(null);
+  const participantRowRef = useRef<HTMLDivElement | null>(null);
+  const [participantDropdownPos, setParticipantDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  }>({ top: 0, left: 0, width: 0 });
 
-    const [createdMeeting, setCreatedMeeting] = useState<CreatedMeeting | null>(null);
-    const [linkCopied, setLinkCopied] = useState(false);
+  const [createdMeeting, setCreatedMeeting] = useState<CreatedMeeting | null>(
+    null,
+  );
+  const [linkCopied, setLinkCopied] = useState(false);
 
-    const inputRef = useRef<HTMLInputElement | null>(null);
-    const inputRowRef = useRef<HTMLDivElement | null>(null);
-    const dropdownRef = useRef<HTMLDivElement | null>(null);
-    const labelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 0 });
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRowRef = useRef<HTMLDivElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const labelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  }>({ top: 0, left: 0, width: 0 });
 
-    const updateDropdownPos = useCallback(() => {
-        if (inputRowRef.current) {
-            const rect = inputRowRef.current.getBoundingClientRect();
-            setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-        }
-    }, []);
+  const updateDropdownPos = useCallback(() => {
+    if (inputRowRef.current) {
+      const rect = inputRowRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  }, []);
 
-    const openDropdown = useCallback(() => {
-        const s = buildSuggestions(inputValue);
-        setSuggestions(s);
-        updateDropdownPos();
-        setShowDropdown(true);
-        setHighlightIdx(0);
-    }, [inputValue, updateDropdownPos]);
+  const openDropdown = useCallback(() => {
+    const s = buildSuggestions(inputValue);
+    setSuggestions(s);
+    updateDropdownPos();
+    setShowDropdown(true);
+    setHighlightIdx(0);
+  }, [inputValue, updateDropdownPos]);
 
-    const closeDropdown = useCallback(() => {
-        setShowDropdown(false);
-    }, []);
+  const closeDropdown = useCallback(() => {
+    setShowDropdown(false);
+  }, []);
 
-    useEffect(() => {
-        const s = buildSuggestions(inputValue);
-        setSuggestions(s);
-        setHighlightIdx(0);
-    }, [inputValue]);
+  useEffect(() => {
+    const s = buildSuggestions(inputValue);
+    setSuggestions(s);
+    setHighlightIdx(0);
+  }, [inputValue]);
 
-    useEffect(() => {
-        function handleClickOutside(e: MouseEvent) {
-            const target = e.target as Node;
-            const inDropdown = dropdownRef.current && dropdownRef.current.contains(target);
-            const inInputRow = inputRowRef.current && inputRowRef.current.contains(target);
-            if (!inDropdown && !inInputRow) closeDropdown();
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      const inDropdown =
+        dropdownRef.current && dropdownRef.current.contains(target);
+      const inInputRow =
+        inputRowRef.current && inputRowRef.current.contains(target);
+      if (!inDropdown && !inInputRow) closeDropdown();
 
-            const inUserDropdown = participantDropdownRef.current && participantDropdownRef.current.contains(target);
-            const inUserRow = participantRowRef.current && participantRowRef.current.contains(target);
-            if (!inUserDropdown && !inUserRow) setShowUserDropdown(false);
-        }
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [closeDropdown]);
+      const inUserDropdown =
+        participantDropdownRef.current &&
+        participantDropdownRef.current.contains(target);
+      const inUserRow =
+        participantRowRef.current && participantRowRef.current.contains(target);
+      if (!inUserDropdown && !inUserRow) setShowUserDropdown(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [closeDropdown]);
 
-    useEffect(() => {
-        function handleEscape(e: KeyboardEvent) {
-            if (e.key === 'Escape' && !showDropdown && !showUserDropdown) {
-                handleClose();
-            }
-        }
-        document.addEventListener('keydown', handleEscape);
-        return () => document.removeEventListener('keydown', handleEscape);
-    }, [handleClose, showDropdown, showUserDropdown]);
+  useEffect(() => {
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape" && !showDropdown && !showUserDropdown) {
+        handleClose();
+      }
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [handleClose, showDropdown, showUserDropdown]);
 
-    const fetchParticipantSuggestions = useCallback(async (query: string) => {
-        try {
-            const res = await fetch(`${API_BASE}/users/search?q=${encodeURIComponent(query)}`, {
-                headers: { Authorization: `Bearer ${user?.token}` },
+  const fetchParticipantSuggestions = useCallback(
+    async (query: string) => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/users/search?q=${encodeURIComponent(query)}`,
+          {
+            headers: { Authorization: `Bearer ${user?.token}` },
+          },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const filtered = data.filter(
+            (u) => !participants.some((p) => p._id === u._id),
+          );
+          setUserResults(filtered);
+          setShowUserDropdown(filtered.length > 0);
+          setUserHighlightIdx(0);
+          if (participantRowRef.current) {
+            const rect = participantRowRef.current.getBoundingClientRect();
+            setParticipantDropdownPos({
+              top: rect.bottom + 4,
+              left: rect.left,
+              width: rect.width,
             });
-            if (res.ok) {
-                const data = await res.json();
-                const filtered = data.filter(u => !participants.some(p => p._id === u._id));
-                setUserResults(filtered);
-                setShowUserDropdown(filtered.length > 0);
-                setUserHighlightIdx(0);
-                if (participantRowRef.current) {
-                    const rect = participantRowRef.current.getBoundingClientRect();
-                    setParticipantDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
-                }
-            }
-        } catch { /* ignore */ }
-    }, [user?.token, participants]);
-
-    // Participant search with debounce — only when input is focused
-    useEffect(() => {
-        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-        if (document.activeElement !== participantInputRef.current) return;
-        searchTimerRef.current = setTimeout(() => fetchParticipantSuggestions(participantQuery), 200);
-        return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
-    }, [participantQuery, fetchParticipantSuggestions]);
-
-    const selectSuggestion = (suggestion: Suggestion) => {
-        setSlots(prev => [...prev, { id: Date.now(), date: suggestion.date, display: formatSlotDisplay(suggestion.date) }]);
-        setInputValue('');
-        setShowDropdown(false);
-        setSlotError(false);
-        if (labelTimerRef.current) clearTimeout(labelTimerRef.current);
-        setLabelFading(false);
-        setLabelText('Scheduling Poll Slots');
-        setTimeout(() => inputRef.current?.focus(), 50);
-    };
-
-    const removeSlot = (id: number) => {
-        setSlots(prev => prev.filter(s => s.id !== id));
-    };
-
-    const addParticipant = (u: ParticipantUser) => {
-        setParticipants(prev => [...prev, u]);
-        setParticipantQuery('');
-        setShowUserDropdown(false);
-        setTimeout(() => participantInputRef.current?.focus(), 50);
-    };
-
-    const removeParticipant = (id: string) => {
-        setParticipants(prev => prev.filter(p => p._id !== id));
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (!showDropdown || suggestions.length === 0) return;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setHighlightIdx(prev => (prev + 1) % suggestions.length);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setHighlightIdx(prev => (prev - 1 + suggestions.length) % suggestions.length);
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            selectSuggestion(suggestions[highlightIdx]);
-        } else if (e.key === 'Escape') {
-            closeDropdown();
+          }
         }
-    };
+      } catch {
+        /* ignore */
+      }
+    },
+    [user?.token, participants],
+  );
 
-    const handleParticipantKeyDown = (e: React.KeyboardEvent) => {
-        if (!showUserDropdown || userResults.length === 0) return;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setUserHighlightIdx(prev => (prev + 1) % userResults.length);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setUserHighlightIdx(prev => (prev - 1 + userResults.length) % userResults.length);
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            addParticipant(userResults[userHighlightIdx]);
-        } else if (e.key === 'Escape') {
-            setShowUserDropdown(false);
-        }
+  // Participant search with debounce — only when input is focused
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (document.activeElement !== participantInputRef.current) return;
+    searchTimerRef.current = setTimeout(
+      () => fetchParticipantSuggestions(participantQuery),
+      200,
+    );
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
+  }, [participantQuery, fetchParticipantSuggestions]);
 
-    const triggerSlotError = () => {
-        setSlotError(true);
-        setLabelFading(true);
-        setLabelText('There must be at least one slot for a meeting');
-        if (labelTimerRef.current) clearTimeout(labelTimerRef.current);
-        labelTimerRef.current = setTimeout(() => {
-            setLabelFading(true);
-            setTimeout(() => {
-                setLabelText('Scheduling Poll Slots');
-                setTimeout(() => setLabelFading(false), 50);
-            }, 400);
-        }, 3000);
-    };
+  const selectSuggestion = (suggestion: Suggestion) => {
+    setSlots((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        date: suggestion.date,
+        display: formatSlotDisplay(suggestion.date),
+      },
+    ]);
+    setInputValue("");
+    setShowDropdown(false);
+    setSlotError(false);
+    if (labelTimerRef.current) clearTimeout(labelTimerRef.current);
+    setLabelFading(false);
+    setLabelText("Scheduling Poll Slots");
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
 
-    const handleAgendaChange = (index: number, field: 'title' | 'duration', value: string | number) => {
-        const next = [...agenda];
-        next[index] = { ...next[index], [field]: value };
-        setAgenda(next);
-    };
+  const removeSlot = (id: number) => {
+    setSlots((prev) => prev.filter((s) => s.id !== id));
+  };
 
-    const addAgendaItem = () => {
-        setAgenda([...agenda, { title: '', duration: 15 }]);
-    };
+  const addParticipant = (u: ParticipantUser) => {
+    setParticipants((prev) => [...prev, u]);
+    setParticipantQuery("");
+    setShowUserDropdown(false);
+    setTimeout(() => participantInputRef.current?.focus(), 50);
+  };
 
-    const removeAgendaItem = (index: number) => {
-        setAgenda(agenda.filter((_, i) => i !== index));
-    };
+  const removeParticipant = (id: string) => {
+    setParticipants((prev) => prev.filter((p) => p._id !== id));
+  };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setInputValue(e.target.value);
-        setSlotError(false);
-        if (labelText !== 'Scheduling Poll Slots') {
-            if (labelTimerRef.current) clearTimeout(labelTimerRef.current);
-            setLabelFading(true);
-            setTimeout(() => {
-                setLabelText('Scheduling Poll Slots');
-                setTimeout(() => setLabelFading(false), 50);
-            }, 300);
-        }
-        if (!showDropdown) openDropdown();
-    };
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showDropdown || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIdx((prev) => (prev + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIdx(
+        (prev) => (prev - 1 + suggestions.length) % suggestions.length,
+      );
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      selectSuggestion(suggestions[highlightIdx]);
+    } else if (e.key === "Escape") {
+      closeDropdown();
+    }
+  };
+
+  const handleParticipantKeyDown = (e: React.KeyboardEvent) => {
+    if (!showUserDropdown || userResults.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setUserHighlightIdx((prev) => (prev + 1) % userResults.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setUserHighlightIdx(
+        (prev) => (prev - 1 + userResults.length) % userResults.length,
+      );
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      addParticipant(userResults[userHighlightIdx]);
+    } else if (e.key === "Escape") {
+      setShowUserDropdown(false);
+    }
+  };
+
+  const triggerSlotError = () => {
+    setSlotError(true);
+    setLabelFading(true);
+    setLabelText("There must be at least one slot for a meeting");
+    if (labelTimerRef.current) clearTimeout(labelTimerRef.current);
+    labelTimerRef.current = setTimeout(() => {
+      setLabelFading(true);
+      setTimeout(() => {
+        setLabelText("Scheduling Poll Slots");
+        setTimeout(() => setLabelFading(false), 50);
+      }, 400);
+    }, 3000);
+  };
+
+  const handleAgendaChange = (
+    index: number,
+    field: "title" | "duration",
+    value: string | number,
+  ) => {
+    const next = [...agenda];
+    next[index] = { ...next[index], [field]: value };
+    setAgenda(next);
+  };
+
+  const addAgendaItem = () => {
+    setAgenda([...agenda, { title: "", duration: 15 }]);
+  };
+
+  const removeAgendaItem = (index: number) => {
+    setAgenda(agenda.filter((_, i) => i !== index));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    setSlotError(false);
+    if (labelText !== "Scheduling Poll Slots") {
+      if (labelTimerRef.current) clearTimeout(labelTimerRef.current);
+      setLabelFading(true);
+      setTimeout(() => {
+        setLabelText("Scheduling Poll Slots");
+        setTimeout(() => setLabelFading(false), 50);
+      }, 300);
+    }
+    if (!showDropdown) openDropdown();
+  };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const filledSlots = slots.filter(s => s.date);
+    const filledSlots = slots.filter((s) => s.date);
     if (filledSlots.length === 0) {
       triggerSlotError();
       inputRef.current?.focus();
@@ -409,36 +514,60 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
       location,
       duration,
       modality,
-      agenda: agenda.filter(a => a.title.trim() !== ''),
-      timeSlots: filledSlots.map(s => ({
-        date: s.date.toISOString().split('T')[0],
+      agenda: agenda.filter((a) => a.title.trim() !== ""),
+      timeSlots: filledSlots.map((s) => ({
+        date: s.date.toISOString().split("T")[0],
         time: s.date.toTimeString().slice(0, 5),
       })),
     });
     onClose();
   };
 
-    const renderAvatar = (u: ParticipantUser, size = 10) => {
-        if (u.profileImage) {
-            return <img src={`${SERVER_BASE}${u.profileImage}`} alt="" className="participant-chip-avatar-img" />;
-        }
-        return <Icon icon={UserIcon} size={size} />;
-    };
+  const renderAvatar = (u: ParticipantUser, size = 10) => {
+    if (u.profileImage) {
+      return (
+        <img
+          src={`${SERVER_BASE}${u.profileImage}`}
+          alt=""
+          className="participant-chip-avatar-img"
+        />
+      );
+    }
+    return <Icon icon={UserIcon} size={size} />;
+  };
 
-    return (
-        <div className={`modal-overlay${closing ? ' modal-closing' : ''}`} onClick={handleClose}>
-            <div className={`modal-content${closing ? ' modal-content-closing' : ''}`} onClick={(e) => e.stopPropagation()}>
-                <button type="button" className="btn-icon modal-close-btn" onClick={handleClose}>
-                    <Icon icon={Cancel01Icon} size={18} />
-                </button>
+  return (
+    <div
+      className={`modal-overlay${closing ? " modal-closing" : ""}`}
+      onClick={handleClose}
+    >
+      <div
+        className={`modal-content${closing ? " modal-content-closing" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="btn-icon modal-close-btn"
+          onClick={handleClose}
+        >
+          <Icon icon={Cancel01Icon} size={18} />
+        </button>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-			<div className="modal-header">
-                    <h2 className="modal-title">Create New Meeting</h2>
-                </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">Create New Meeting</h2>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <label className="form-label">Meeting Title</label>
-              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{title.length}/100</span>
+              <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                {title.length}/100
+              </span>
             </div>
             <input
               type="text"
@@ -453,9 +582,17 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
           </div>
 
           <div className="form-group">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <label className="form-label">Description (Optional)</label>
-              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{description.length}/500</span>
+              <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                {description.length}/500
+              </span>
             </div>
             <textarea
               className="input"
@@ -463,44 +600,87 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              style={{ resize: 'vertical', fontFamily: 'inherit' }}
+              style={{ resize: "vertical", fontFamily: "inherit" }}
               id="input-meeting-description"
               maxLength={500}
             />
           </div>
 
           <div className="form-group">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+              }}
+            >
               <label className="form-label">Agenda Items (Optional)</label>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
               {agenda.map((item, index) => (
-                <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <div style={{ flex: 1, position: 'relative' }}>
+                <div
+                  key={index}
+                  style={{ display: "flex", gap: "8px", alignItems: "center" }}
+                >
+                  <div style={{ flex: 1, position: "relative" }}>
                     <input
                       type="text"
                       className="input"
                       placeholder={`e.g., Review Q3 OKRs`}
                       value={item.title}
-                      onChange={(e) => handleAgendaChange(index, 'title', e.target.value)}
-                      style={{ marginTop: 0, width: '100%', paddingRight: '45px' }}
+                      onChange={(e) =>
+                        handleAgendaChange(index, "title", e.target.value)
+                      }
+                      style={{
+                        marginTop: 0,
+                        width: "100%",
+                        paddingRight: "45px",
+                      }}
                       maxLength={200}
                     />
-                    <span style={{ position: 'absolute', right: '8px', bottom: '8px', fontSize: '10px', color: 'var(--text-tertiary)', pointerEvents: 'none' }}>
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: "8px",
+                        bottom: "8px",
+                        fontSize: "10px",
+                        color: "var(--text-tertiary)",
+                        pointerEvents: "none",
+                      }}
+                    >
                       {item.title.length}/200
                     </span>
                   </div>
-                  <div style={{ position: 'relative', width: '90px' }}>
+                  <div style={{ position: "relative", width: "90px" }}>
                     <input
                       type="number"
                       className="input"
                       placeholder="Mins"
                       value={item.duration}
-                      onChange={(e) => handleAgendaChange(index, 'duration', Number(e.target.value))}
-                      style={{ marginTop: 0, paddingRight: '28px' }}
+                      onChange={(e) =>
+                        handleAgendaChange(
+                          index,
+                          "duration",
+                          Number(e.target.value),
+                        )
+                      }
+                      style={{ marginTop: 0, paddingRight: "28px" }}
                     />
-                    <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', fontSize: '12px', color: 'var(--text-tertiary)', pointerEvents: 'none' }}>
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: "10px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        fontSize: "12px",
+                        color: "var(--text-tertiary)",
+                        pointerEvents: "none",
+                      }}
+                    >
                       min
                     </span>
                   </div>
@@ -508,7 +688,7 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
                     type="button"
                     className="btn-icon"
                     onClick={() => removeAgendaItem(index)}
-                    style={{ width: '32px', height: '32px', flexShrink: 0 }}
+                    style={{ width: "32px", height: "32px", flexShrink: 0 }}
                   >
                     <Icon icon={Delete02Icon} size={16} />
                   </button>
@@ -518,56 +698,108 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
                 type="button"
                 className="btn btn-secondary"
                 onClick={addAgendaItem}
-                style={{ width: 'fit-content', fontSize: '12px', padding: '4px 12px', marginTop: '4px' }}
+                style={{
+                  width: "fit-content",
+                  fontSize: "12px",
+                  padding: "4px 12px",
+                  marginTop: "4px",
+                }}
               >
                 <Icon icon={Add01Icon} size={14} /> Add agenda item
               </button>
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+          <div className="form-group" style={{ marginBottom: "0.5rem" }}>
             <label className="form-label">Meeting Modality</label>
             <div className="modality-options">
-              {(['Online', 'Offline', 'Hybrid'] as const).map(m => (
+              {(["Online", "Offline", "Hybrid"] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
-                  className={`modality-btn ${modality === m ? 'active' : ''}`}
+                  className={`modality-btn ${modality === m ? "active" : ""}`}
                   onClick={() => setModality(m)}
                   id={`modality-${m.toLowerCase()}`}
                 >
-                  {m === 'Online' && <Icon icon={Link01Icon} size={14} />}
-                  {m === 'Offline' && <Icon icon={Location01Icon} size={14} />}
-                  {m === 'Hybrid' && <><Icon icon={Link01Icon} size={14} /><Icon icon={Location01Icon} size={14} /></>}
+                  {m === "Online" && <Icon icon={Link01Icon} size={14} />}
+                  {m === "Offline" && <Icon icon={Location01Icon} size={14} />}
+                  {m === "Hybrid" && (
+                    <>
+                      <Icon icon={Link01Icon} size={14} />
+                      <Icon icon={Location01Icon} size={14} />
+                    </>
+                  )}
                   {m}
                 </button>
               ))}
             </div>
           </div>
 
-          {modality === 'Online' && (
-            <div className="form-group" style={{ padding: '0', background: 'none', borderRadius: 'var(--radius-sm)', border: 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
-                <Icon icon={Link01Icon} size={14} />
-                A video call room will be auto-created
+          {modality === "Online" && (
+            <div
+              className="form-group"
+              style={{
+                padding: "0",
+                background: "none",
+                borderRadius: "var(--radius-sm)",
+                border: "none",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  fontSize: "0.8125rem",
+                  color: "var(--primary)",
+                }}
+              >
+                <Icon icon={Link01Icon} size={14} />A video call room will be
+                auto-created
               </div>
             </div>
           )}
 
-          {modality === 'Hybrid' && (
-            <div className="form-group" style={{ padding: '0', background: 'none', borderRadius: 'var(--radius-sm)', border: 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)' }}>
-                <Icon icon={Link01Icon} size={14} />
-                A video call room will be auto-created
+          {modality === "Hybrid" && (
+            <div
+              className="form-group"
+              style={{
+                padding: "0",
+                background: "none",
+                borderRadius: "var(--radius-sm)",
+                border: "none",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  fontSize: "0.8125rem",
+                  color: "var(--primary)",
+                }}
+              >
+                <Icon icon={Link01Icon} size={14} />A video call room will be
+                auto-created
               </div>
             </div>
           )}
 
-          {(modality === 'Offline' || modality === 'Hybrid') && (
+          {(modality === "Offline" || modality === "Hybrid") && (
             <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
                 <label className="form-label">Physical Location</label>
-                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{location.length}/200</span>
+                <span
+                  style={{ fontSize: "11px", color: "var(--text-tertiary)" }}
+                >
+                  {location.length}/200
+                </span>
               </div>
               <input
                 type="text"
@@ -577,6 +809,7 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
                 maxLength={200}
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
+                required={modality == "Offline" || modality == "Hybrid"}
               />
             </div>
           )}
@@ -586,7 +819,7 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
             <select
               className="input"
               value={duration}
-              onChange={e => setDuration(Number(e.target.value))}
+              onChange={(e) => setDuration(Number(e.target.value))}
               id="input-meeting-duration"
             >
               <option value={15}>15 minutes</option>
@@ -603,11 +836,17 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
             <div className="participant-picker-wrapper">
               {participants.length > 0 && (
                 <div className="participant-chips">
-                  {participants.map(p => (
+                  {participants.map((p) => (
                     <span key={p._id} className="participant-chip removable">
-                      <span className="participant-chip-avatar">{renderAvatar(p)}</span>
+                      <span className="participant-chip-avatar">
+                        {renderAvatar(p)}
+                      </span>
                       {p.name}
-                      <button type="button" className="participant-chip-remove" onClick={() => removeParticipant(p._id)}>
+                      <button
+                        type="button"
+                        className="participant-chip-remove"
+                        onClick={() => removeParticipant(p._id)}
+                      >
                         <Icon icon={Cancel01Icon} size={10} />
                       </button>
                     </span>
@@ -624,48 +863,76 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
                   value={participantQuery}
                   onChange={(e) => setParticipantQuery(e.target.value)}
                   onFocus={() => fetchParticipantSuggestions(participantQuery)}
-                  onBlur={() => setTimeout(() => setShowUserDropdown(false), 150)}
+                  onBlur={() =>
+                    setTimeout(() => setShowUserDropdown(false), 150)
+                  }
                   onKeyDown={handleParticipantKeyDown}
                   autoComplete="off"
                 />
               </div>
             </div>
 
-            {showUserDropdown && userResults.length > 0 && createPortal(
-              <div
-                ref={participantDropdownRef}
-                className="nldate-dropdown"
-                style={{ top: participantDropdownPos.top, left: participantDropdownPos.left, width: participantDropdownPos.width }}
-              >
-                {userResults.map((u, i) => (
-                  <button
-                    key={u._id}
-                    type="button"
-                    className={`nldate-option${i === userHighlightIdx ? ' highlighted' : ''}`}
-                    onMouseEnter={() => setUserHighlightIdx(i)}
-                    onClick={() => addParticipant(u)}
-                  >
-                    <span className="nldate-option-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span className="participant-chip-avatar">{renderAvatar(u, 12)}</span>
-                      {u.name}
-                    </span>
-                    <span className="nldate-option-detail">{u.email}</span>
-                  </button>
-                ))}
-              </div>,
-              document.body
-            )}
+            {showUserDropdown &&
+              userResults.length > 0 &&
+              createPortal(
+                <div
+                  ref={participantDropdownRef}
+                  className="nldate-dropdown"
+                  style={{
+                    top: participantDropdownPos.top,
+                    left: participantDropdownPos.left,
+                    width: participantDropdownPos.width,
+                  }}
+                >
+                  {userResults.map((u, i) => (
+                    <button
+                      key={u._id}
+                      type="button"
+                      className={`nldate-option${i === userHighlightIdx ? " highlighted" : ""}`}
+                      onMouseEnter={() => setUserHighlightIdx(i)}
+                      onClick={() => addParticipant(u)}
+                    >
+                      <span
+                        className="nldate-option-label"
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                        }}
+                      >
+                        <span className="participant-chip-avatar">
+                          {renderAvatar(u, 12)}
+                        </span>
+                        {u.name}
+                      </span>
+                      <span className="nldate-option-detail">{u.email}</span>
+                    </button>
+                  ))}
+                </div>,
+                document.body,
+              )}
           </div>
 
           <div className="form-group">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label className={`form-label slot-label${labelFading ? ' fading' : ''}${slotError ? ' slot-label-error' : ''}`}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <label
+                className={`form-label slot-label${labelFading ? " fading" : ""}${slotError ? " slot-label-error" : ""}`}
+              >
                 {labelText}
               </label>
             </div>
 
             <div className="nldate-wrapper">
-              <div ref={inputRowRef} className={`nldate-input-row${slotError ? ' nldate-error' : ''}`}>
+              <div
+                ref={inputRowRef}
+                className={`nldate-input-row${slotError ? " nldate-error" : ""}`}
+              >
                 <Icon icon={Clock01Icon} size={14} className="nldate-icon" />
                 <input
                   ref={inputRef}
@@ -680,65 +947,109 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
                   autoComplete="off"
                 />
                 {inputValue && (
-                  <button type="button" className="nldate-clear" onClick={() => { setInputValue(''); inputRef.current?.focus(); }}>
+                  <button
+                    type="button"
+                    className="nldate-clear"
+                    onClick={() => {
+                      setInputValue("");
+                      inputRef.current?.focus();
+                    }}
+                  >
                     <Icon icon={Cancel01Icon} size={12} />
                   </button>
                 )}
               </div>
             </div>
 
-            {showDropdown && suggestions.length > 0 && createPortal(
-              <div
-                ref={dropdownRef}
-                className="nldate-dropdown"
-                style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
-              >
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`nldate-option${i === highlightIdx ? ' highlighted' : ''}`}
-                    onMouseEnter={() => setHighlightIdx(i)}
-                    onClick={() => selectSuggestion(s)}
-                  >
-                    <span className="nldate-option-label">{s.label}</span>
-                    <span className="nldate-option-detail">{s.detail}</span>
-                  </button>
-                ))}
-              </div>,
-              document.body
-            )}
+            {showDropdown &&
+              suggestions.length > 0 &&
+              createPortal(
+                <div
+                  ref={dropdownRef}
+                  className="nldate-dropdown"
+                  style={{
+                    top: dropdownPos.top,
+                    left: dropdownPos.left,
+                    width: dropdownPos.width,
+                  }}
+                >
+                  {suggestions.map((s, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`nldate-option${i === highlightIdx ? " highlighted" : ""}`}
+                      onMouseEnter={() => setHighlightIdx(i)}
+                      onClick={() => selectSuggestion(s)}
+                    >
+                      <span className="nldate-option-label">{s.label}</span>
+                      <span className="nldate-option-detail">{s.detail}</span>
+                    </button>
+                  ))}
+                </div>,
+                document.body,
+              )}
 
-            {slots.map(slot => (
+            {slots.map((slot) => (
               <div key={slot.id} className="slot-row">
                 <div className="slot-row-content">
-                  <Icon icon={Calendar02Icon} size={14} className="slot-row-icon" />
+                  <Icon
+                    icon={Calendar02Icon}
+                    size={14}
+                    className="slot-row-icon"
+                  />
                   <span>{slot.display}</span>
                 </div>
-                <button type="button" className="btn-icon" onClick={() => removeSlot(slot.id)} style={{ width: '1.25rem', height: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn-icon"
+                  onClick={() => removeSlot(slot.id)}
+                  style={{ width: "1.25rem", height: "1.25rem" }}
+                >
                   <Icon icon={Delete02Icon} size={14} />
                 </button>
               </div>
             ))}
 
             {slots.length > 1 && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+              <div
+                style={{
+                  fontSize: "0.75rem",
+                  color: "var(--text-muted)",
+                  marginTop: "0.5rem",
+                }}
+              >
                 Multiple slots — a poll will be sent to participants to vote.
               </div>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={handleClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" id="btn-create-meeting">
+          <div
+            style={{
+              display: "flex",
+              gap: "0.75rem",
+              justifyContent: "flex-end",
+              marginTop: "1.5rem",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              id="btn-create-meeting"
+            >
               <Icon icon={Calendar02Icon} size={16} />
               Create Meeting
             </button>
           </div>
         </form>
 
-
-                <style>{`
+        <style>{`
           .modality-options {
             display: flex; gap: 0.5rem;
           }
@@ -907,7 +1218,7 @@ export default function MeetingCreation({ onClose, onSubmit }: MeetingCreationPr
             75%      { transform: translateX(0.25rem); }
           }
         `}</style>
-            </div>
-        </div>
-    );
+      </div>
+    </div>
+  );
 }

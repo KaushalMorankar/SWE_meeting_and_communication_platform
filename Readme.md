@@ -132,7 +132,7 @@ npm run preview
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VITE_API_URL` | `http://localhost:5000` | Backend API base URL |
+| `VITE_API_URL` | `http://localhost:5000/api` | Backend API base URL |
 
 ### Optional — WebRTC TURN Server
 

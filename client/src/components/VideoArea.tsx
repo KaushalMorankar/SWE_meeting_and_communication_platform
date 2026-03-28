@@ -8,6 +8,18 @@ import {
   MinimizeScreenIcon,
   SidebarLeftIcon,
   SidebarRightIcon,
+  Clock01Icon,
+  Note01Icon,
+  Task01Icon,
+  ArrowRight01Icon,
+  PlayIcon,
+  PauseIcon,
+  Tick01Icon,
+  FolderFavouriteIcon,
+  CheckmarkCircle01Icon,
+  AlertCircleIcon,
+  FlashIcon,
+  SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import ShortcutTooltip from "./ShortcutTooltip";
 import Kbd from "./Kbd";
@@ -42,6 +54,12 @@ interface VideoAreaProps {
   onMeetingEnded?: () => void;
   onTriggerAddActionItem?: () => void;
   onTriggerAddAgendaItem?: () => void;
+  agendaItems?: any[];
+  minutesItems?: any[];
+  actionItems?: any[];
+  onAgendaChange?: (items: any[]) => void;
+  onMinutesChange?: (items: any[]) => void;
+  onRefreshActionItems?: () => void;
 }
 
 function VideoTile({ stream, name, profileImage, muted, isSelf, isScreenShare, speaking }: VideoTileProps) {
@@ -135,8 +153,102 @@ export default function VideoArea({
   onMeetingEnded,
   onTriggerAddActionItem,
   onTriggerAddAgendaItem,
+  agendaItems = [],
+  minutesItems = [],
+  actionItems = [],
+  onAgendaChange,
+  onMinutesChange,
+  onRefreshActionItems,
 }: VideoAreaProps) {
   const { socket, connected } = useSocket();
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [activeNote, setActiveNote] = useState("");
+  const [parkingLotItems, setParkingLotItems] = useState<string[]>([]);
+  const [showToast, setShowToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedTime((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleAddActionItem = async (type: string) => {
+    if (!meetingId) return;
+    const title = activeNote.trim() || `Action item: ${type}`;
+    try {
+      const res = await (fetch as any)(`${SERVER_BASE}/api/action-items/${meetingId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${JSON.parse(localStorage.getItem('user') || '{}').token}`
+        },
+        body: JSON.stringify({ title, category: type }),
+      });
+      if (res.ok) {
+        onRefreshActionItems?.();
+        setActiveNote("");
+        triggerToast("Action item saved");
+      }
+    } catch (err) {
+      console.error("Failed to save action item:", err);
+    }
+  };
+
+  const handleAddNote = () => {
+    if (!activeNote.trim()) return;
+    const newItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      title: activeNote.trim(),
+      status: 'pending' as const,
+      duration: 0
+    };
+    onMinutesChange?.([...minutesItems, newItem]);
+    setActiveNote("");
+    triggerToast("Note captured");
+  };
+
+  const handleAddParkingLot = () => {
+    if (!activeNote.trim()) return;
+    setParkingLotItems(prev => [...prev, activeNote.trim()]);
+    setActiveNote("");
+    triggerToast("Added to parking lot");
+  };
+
+  const triggerToast = (msg: string) => {
+    setShowToast(msg);
+    setTimeout(() => setShowToast(null), 3000);
+  };
+
+  const advanceAgenda = () => {
+    const activeIdx = agendaItems.findIndex(item => item.status === 'active');
+    if (activeIdx === -1) {
+      // If none active, make first pending active
+      const firstPendingIdx = agendaItems.findIndex(item => item.status === 'pending');
+      if (firstPendingIdx !== -1) {
+        const newItems = [...agendaItems];
+        newItems[firstPendingIdx] = { ...newItems[firstPendingIdx], status: 'active' };
+        onAgendaChange?.(newItems);
+      }
+    } else {
+      // Complete current, move to next
+      const newItems = [...agendaItems];
+      newItems[activeIdx] = { ...newItems[activeIdx], status: 'completed' };
+      const nextPendingIdx = newItems.findIndex((item, idx) => idx > activeIdx && item.status === 'pending');
+      if (nextPendingIdx !== -1) {
+        newItems[nextPendingIdx] = { ...newItems[nextPendingIdx], status: 'active' };
+      }
+      onAgendaChange?.(newItems);
+      triggerToast(nextPendingIdx === -1 ? "Agenda complete!" : "Advanced to next item");
+    }
+  };
   const {
     localStream,
     peers,
@@ -225,6 +337,7 @@ export default function VideoArea({
 
   return (
     <div className="video-area">
+      {showToast && <div className={`focus-toast show`}>{showToast}</div>}
       <div className="video-header">
         {!agendaPanelOpen && (
           <ShortcutTooltip keys={["mod", "["]} position="right">
@@ -233,15 +346,27 @@ export default function VideoArea({
             </button>
           </ShortcutTooltip>
         )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 className="video-meeting-title">{meetingTitle || "No Active Meeting"}</h2>
-          <div className="video-meeting-meta">
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: connected ? '#22c55e' : '#ef4444', flexShrink: 0 }} title={connected ? 'Connected' : 'Disconnected'} />
-            <Icon icon={UserGroupIcon} size={14} />
-            <span>
-              {hasJoined ? `${totalParticipants} in call` : `${participants?.length || 0} participants`}
-            </span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 className="video-meeting-title">{meetingTitle || "No Active Meeting"}</h2>
+            <div className="video-meeting-meta">
+              <span className={`offline-dot ${connected ? 'connected' : ''}`} />
+              <Icon icon={UserGroupIcon} size={14} />
+              <span>
+                {modality === "Offline"
+                  ? `${participants?.length || 0} attendees`
+                  : hasJoined ? `${totalParticipants} in call` : `${participants?.length || 0} participants`
+                }
+              </span>
+              {modality === "Offline" && <span className="chip chip-emerald" style={{ fontSize: '0.625rem' }}>Offline Focus</span>}
+            </div>
           </div>
+          {modality === "Offline" && (
+            <div className="focus-header-meta">
+              {/* <span className="badge badge-rec"><span className="rec-dot"></span> Recording</span> */}
+              <span className="timer-val">{formatTime(elapsedTime)}</span>
+            </div>
+          )}
         </div>
         <ShortcutTooltip keys={["F"]}>
           <button
@@ -265,8 +390,126 @@ export default function VideoArea({
       <div className="video-container">
         <div className="video-placeholder">
           {modality === "Offline" ? (
-            <div className="video-offline-message">
-              This is an Offline meeting. Location details are in the schedule.
+            <div className="focus-mode-shell">
+              <div className="focus-main">
+                <div className="focus-left">
+                  <div className="focus-section">
+                    <div className="focus-section-label">Agenda</div>
+                    <div className="focus-agenda-card">
+                      {agendaItems.length === 0 ? (
+                        <div className="focus-empty-state">No agenda items defined</div>
+                      ) : (
+                        agendaItems.slice(0, 4).map((item, idx) => (
+                          <div key={item.id} className={`focus-agenda-item ${item.status}`}>
+                            <div className={`focus-ai-num ${item.status}`}>
+                              {item.status === 'completed' ? <Icon icon={Tick01Icon} size={12} /> : idx + 1}
+                            </div>
+                            <div className="focus-ai-content">
+                              <div className="focus-ai-name">{item.title}</div>
+                              <div className="focus-ai-time">{item.duration} min · {item.status}</div>
+                            </div>
+                            <span className={`focus-ai-status st-${item.status}`}>{item.status}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="focus-progress-wrap">
+                    <div className="focus-pb-label">
+                      <span>Progress</span>
+                      <span>{Math.round((agendaItems.filter(i => i.status === 'completed').length / (agendaItems.length || 1)) * 100)}%</span>
+                    </div>
+                    <div className="focus-pb-track">
+                      <div
+                        className="focus-pb-fill"
+                        style={{ width: `${(agendaItems.filter(i => i.status === 'completed').length / (agendaItems.length || 1)) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div className="focus-section">
+                    <div className="focus-section-label">Quick Capture</div>
+                    <div className="focus-note-card">
+                      <textarea
+                        className="focus-note-input"
+                        placeholder="Type a note, decision, or action item..."
+                        value={activeNote}
+                        onChange={(e) => setActiveNote(e.target.value)}
+                      ></textarea>
+                      <div className="focus-note-actions">
+                        <button className="focus-note-btn" onClick={() => handleAddActionItem('Technical')}>+ Technical</button>
+                        <button className="focus-note-btn" onClick={() => handleAddActionItem('Decision')}>+ Decision</button>
+                        <button className="focus-note-btn" onClick={() => handleAddActionItem('Follow-up')}>+ Follow-up</button>
+                        <button className="focus-note-btn" onClick={handleAddParkingLot}>+ Parking</button>
+                        <button className="focus-note-btn primary" onClick={handleAddNote}>Save Note</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="focus-ctrl-row">
+                    <button className="focus-ctrl-btn" onClick={() => triggerToast("Agenda paused")}>
+                      <Icon icon={PauseIcon} size={14} /> Pause Item
+                    </button>
+                    <button className="focus-ctrl-btn next" onClick={advanceAgenda}>
+                      Next Item <Icon icon={ArrowRight01Icon} size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="focus-right">
+                  <div className="focus-section">
+                    <div className="focus-section-label">Attendees</div>
+                    <div className="focus-attendee-row">
+                      {participants?.map((p, idx) => (
+                        <div key={p.id || idx} className="focus-av-chip">
+                          <div className="focus-av-dot">{p.name?.charAt(0) || "U"}</div>
+                          <span className="focus-av-name">{p.name || "User"}</span>
+                        </div>
+                      ))}
+                      {participants?.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>No attendees listed</span>}
+                    </div>
+                  </div>
+
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                    <div className="focus-section-label">Action Items · {actionItems.length}</div>
+                    <div className="focus-action-feed">
+                      {actionItems.length === 0 ? (
+                        <div className="focus-empty-state">No action items captured yet</div>
+                      ) : (
+                        actionItems.map((ai, idx) => (
+                          <div key={ai.id || idx} className={`focus-action-card ${ai.category?.toLowerCase()}`}>
+                            <div className="focus-ac-top">
+                              <span className={`focus-ac-type ${ai.category?.toLowerCase()}`}>{ai.category}</span>
+                              <span className="focus-ac-assignee">→ {ai.assignee || 'Unassigned'}</span>
+                            </div>
+                            <div className="focus-ac-text">{ai.title}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="focus-section">
+                    <div className="focus-section-label">Parking Lot</div>
+                    <div className="focus-parking-lot">
+                      <div className="focus-pl-title">Off-topic items</div>
+                      {parkingLotItems.length === 0 ? (
+                        <div style={{ fontSize: '0.75rem', opacity: 0.5 }}>Empty</div>
+                      ) : (
+                        parkingLotItems.map((item, i) => (
+                          <div key={i} className="focus-pl-item">{item}</div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="focus-sync-banner">
+                    <div className="focus-sync-text">Changes synced to server</div>
+                    <Icon icon={CheckmarkCircle01Icon} size={12} style={{ color: 'var(--accent-emerald)' }} />
+                  </div>
+                </div>
+              </div>
             </div>
           ) : !hasJoined ? (
             <div className="video-prejoin">
@@ -567,6 +810,310 @@ export default function VideoArea({
           font-weight: 700;
           color: white;
           letter-spacing: 0.03125rem;
+        }
+
+        /* Offline Focus Mode Styles */
+        .focus-mode-shell {
+          width: 100%;
+          height: 100%;
+          background: var(--bg-secondary);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .offline-dot {
+          width: 0.5rem;
+          height: 0.5rem;
+          border-radius: 50%;
+          background: #ef4444;
+          transition: background 0.3s;
+        }
+        .offline-dot.connected {
+          background: var(--accent-emerald);
+          box-shadow: 0 0 10px var(--accent-emerald);
+          animation: pulse 2s infinite;
+        }
+
+        .focus-header-meta {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+        .badge-rec {
+          background: rgba(239, 68, 68, 0.1);
+          color: #ef4444;
+          font-size: 0.625rem;
+          padding: 0.125rem 0.5rem;
+          border-radius: 1rem;
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+        .rec-dot {
+          width: 0.25rem;
+          height: 0.25rem;
+          border-radius: 50%;
+          background: currentColor;
+          animation: pulse 1s infinite;
+        }
+        .timer-val {
+          font-family: monospace;
+          font-size: 0.8125rem;
+          color: var(--text-secondary);
+        }
+
+        .focus-main {
+          flex: 1;
+          display: grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap: 0;
+          height: 100%;
+          border-top: 1px solid var(--border);
+        }
+
+        .focus-left {
+          padding: 1.25rem;
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+          border-right: 1px solid var(--border);
+          overflow-y: auto;
+          background: var(--bg-primary);
+        }
+
+        .focus-right {
+          padding: 1.25rem;
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+          background: var(--bg-secondary);
+          overflow-y: auto;
+          min-height: 0;
+        }
+
+        .focus-section-label {
+          font-size: 0.625rem;
+          font-weight: 700;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-bottom: 0.5rem;
+        }
+
+        .focus-agenda-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          overflow: hidden;
+        }
+        .focus-agenda-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.625rem 1rem;
+          border-bottom: 1px solid var(--border);
+          transition: background 0.2s;
+        }
+        .focus-agenda-item:last-child { border-bottom: none; }
+        .focus-agenda-item.active { background: var(--primary-muted); }
+        .focus-agenda-item.completed { opacity: 0.6; }
+
+        .focus-ai-num {
+          width: 1.25rem;
+          height: 1.25rem;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.625rem;
+          font-weight: 700;
+          background: var(--bg-elevated);
+          color: var(--text-muted);
+          border: 1px solid var(--border);
+        }
+        .focus-ai-num.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .focus-ai-num.completed { background: var(--accent-emerald); color: white; border-color: var(--accent-emerald); }
+
+        .focus-ai-name { font-size: 0.8125rem; font-weight: 500; }
+        .focus-ai-time { font-size: 0.6875rem; color: var(--text-muted); }
+
+        .focus-ai-status {
+          margin-left: auto;
+          font-size: 0.625rem;
+          padding: 0.125rem 0.375rem;
+          border-radius: 1rem;
+          text-transform: capitalize;
+        }
+        .st-active { background: var(--primary-muted); color: var(--primary); }
+        .st-completed { background: var(--accent-emerald-muted); color: var(--accent-emerald); }
+        .st-pending { background: var(--bg-elevated); color: var(--text-muted); }
+
+        .focus-progress-wrap {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          padding: 0.875rem 1rem;
+          border-radius: var(--radius-md);
+        }
+        .focus-pb-label {
+          display: flex;
+          justify-content: space-between;
+          font-size: 0.75rem;
+          margin-bottom: 0.5rem;
+          color: var(--text-secondary);
+        }
+        .focus-pb-track { height: 0.375rem; background: var(--bg-elevated); border-radius: 1rem; overflow: hidden; }
+        .focus-pb-fill { height: 100%; background: var(--primary); transition: width 0.5s ease-out; }
+
+        .focus-note-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          padding: 0.75rem;
+        }
+        .focus-note-input {
+          width: 100%;
+          min-height: 4rem;
+          background: transparent;
+          border: none;
+          outline: none;
+          color: var(--text-primary);
+          font-family: inherit;
+          font-size: 0.8125rem;
+          resize: none;
+        }
+        .focus-note-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.375rem;
+          margin-top: 0.5rem;
+        }
+        .focus-note-btn {
+          font-size: 0.6875rem;
+          padding: 0.25rem 0.625rem;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--border);
+          background: var(--bg-elevated);
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .focus-note-btn:hover { background: var(--bg-hover); }
+        .focus-note-btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .focus-ctrl-row { display: flex; gap: 0.75rem; }
+        .focus-ctrl-btn {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          padding: 0.625rem;
+          border-radius: var(--radius-md);
+          border: 1px solid var(--border);
+          background: var(--bg-card);
+          color: var(--text-primary);
+          font-weight: 500;
+          font-size: 0.8125rem;
+          cursor: pointer;
+        }
+        .focus-ctrl-btn.next { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .focus-attendee-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .focus-av-chip {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
+          background: var(--bg-elevated);
+          padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+          border-radius: 2rem;
+          border: 1px solid var(--border);
+        }
+        .focus-av-dot {
+          width: 1.25rem;
+          height: 1.25rem;
+          border-radius: 50%;
+          background: var(--primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.625rem;
+          color: white;
+          font-weight: 700;
+        }
+        .focus-av-name { font-size: 0.75rem; color: var(--text-primary); }
+
+        .focus-action-feed {
+          flex: 1;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 0.625rem;
+          min-height: 0;
+        }
+        .focus-action-card {
+          background: var(--bg-card);
+          padding: 0.75rem;
+          border-radius: var(--radius-md);
+          border-left: 3px solid var(--border);
+        }
+        .focus-action-card.technical { border-left-color: var(--flexoki-blue-500); }
+        .focus-action-card.decision { border-left-color: var(--accent-emerald); }
+        .focus-action-card.follow-up { border-left-color: var(--flexoki-magenta-500); }
+
+        .focus-ac-top { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; margin-bottom: 0.375rem; }
+        .focus-ac-type { font-size: 0.5625rem; font-weight: 700; text-transform: uppercase; }
+        .focus-ac-type.technical { color: var(--flexoki-blue-500); }
+        .focus-ac-type.decision { color: var(--accent-emerald); }
+        .focus-ac-assignee { font-size: 0.6875rem; color: var(--text-muted); }
+        .focus-ac-text { font-size: 0.75rem; line-height: 1.4; color: var(--text-primary); }
+
+        .focus-parking-lot {
+          background: rgba(239, 159, 39, 0.05);
+          border: 1px solid rgba(239, 159, 39, 0.2);
+          border-radius: var(--radius-md);
+          padding: 0.75rem;
+        }
+        .focus-pl-title { font-size: 0.75rem; font-weight: 600; color: #ef9f27; margin-bottom: 0.25rem; }
+        .focus-pl-item { font-size: 0.75rem; padding: 0.25rem 0; border-bottom: 1px solid rgba(239, 159, 39, 0.1); }
+        .focus-pl-item:last-child { border-bottom: none; }
+
+        .focus-sync-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: var(--bg-elevated);
+          padding: 0.5rem 0.75rem;
+          border-radius: var(--radius-md);
+          margin-top: auto;
+        }
+        .focus-sync-text { font-size: 0.6875rem; color: var(--text-muted); }
+
+        .focus-toast {
+          position: fixed;
+          bottom: 1.5rem;
+          right: 1.5rem;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border);
+          color: var(--text-primary);
+          padding: 0.625rem 1rem;
+          border-radius: var(--radius-md);
+          font-size: 0.8125rem;
+          box-shadow: var(--shadow-lg);
+          z-index: 1000;
+          opacity: 0;
+          transform: translateY(1rem);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .focus-toast.show { opacity: 1; transform: translateY(0); }
+
+        .focus-empty-state {
+          padding: 1.5rem;
+          text-align: center;
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          background: var(--bg-elevated);
+          border-radius: var(--radius-sm);
         }
       `}</style>
     </div>
